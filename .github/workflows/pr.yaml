@@ -35,8 +35,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Test
         run: go test ./... -tags test -coverpkg=./... -coverprofile=coverage.out -covermode=atomic
-        env:
-          SOURCES_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
