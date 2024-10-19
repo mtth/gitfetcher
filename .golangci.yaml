@@ -1,9 +1,6 @@
 linters-settings:
   errcheck:
     check-type-assertions: true
-  forbidigo:
-    forbid:
-      - '^fmt\.Print'
   govet:
     enable:
       - nilness

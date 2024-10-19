@@ -12,49 +12,33 @@ import (
 	"time"
 )
 
-type SourceFetcher interface {
-	FetchSources(ctx context.Context) error
-}
-
-func NewSourceFetcher(root string, cfg Config) (SourceFetcher, error) {
-	finder, err := newSourceFinder(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &realSourceFetcher{root, finder}, nil
-}
-
-type realSourceFetcher struct {
-	root   string
-	finder sourceFinder
-}
-
-func (f *realSourceFetcher) FetchSources(ctx context.Context) error {
-	srcs, err := f.finder.findSources(ctx)
-	if err != nil {
-		return err
-	}
-
+func SyncSources(ctx context.Context, root string, srcs []*Source) error {
+	syncer := &realSourcesSyncer{root}
+	var errs []error
 	for _, src := range srcs {
-		attrs := slog.Group("data", slog.String("name", src.name), slog.String("url", src.fetchURL))
-		if err := f.syncSource(ctx, src); err != nil {
+		attrs := slog.Group("data", slog.String("name", src.Name), slog.String("url", src.FetchURL))
+		if err := syncer.syncSource(ctx, src); err != nil {
 			slog.Error("Unable to sync source.", attrs, slog.Any("err", err))
 		} else {
 			slog.Info("Synced source.", attrs)
 		}
 	}
-	return nil
+	return errors.Join(errs...)
+}
+
+type realSourcesSyncer struct {
+	root string
 }
 
 type target struct {
 	folder string
-	source *source
+	source *Source
 }
 
-func (f *realSourceFetcher) syncSource(ctx context.Context, src *source) error {
+func (f *realSourcesSyncer) syncSource(ctx context.Context, src *Source) error {
 	target := &target{
 		source: src,
-		folder: filepath.Join(f.root, src.name) + ".git",
+		folder: filepath.Join(f.root, src.Name) + ".git",
 	}
 
 	lastSyncedAt := targetModTime(target)
@@ -63,7 +47,7 @@ func (f *realSourceFetcher) syncSource(ctx context.Context, src *source) error {
 			return err
 		}
 	}
-	if lastSyncedAt.Before(src.lastUpdatedAt) {
+	if lastSyncedAt.Before(src.LastUpdatedAt) {
 		if err := f.updateTargetContents(ctx, target); err != nil {
 			return err
 		}
@@ -71,7 +55,7 @@ func (f *realSourceFetcher) syncSource(ctx context.Context, src *source) error {
 	return f.updateTargetMetadata(ctx, target)
 }
 
-func (f *realSourceFetcher) createTarget(ctx context.Context, target *target) error {
+func (f *realSourcesSyncer) createTarget(ctx context.Context, target *target) error {
 	if err := os.MkdirAll(target.folder, 0755); err != nil {
 		return err
 	}
@@ -91,11 +75,11 @@ func (f *realSourceFetcher) createTarget(ctx context.Context, target *target) er
 		"-m",
 		target.source.defaultBranch,
 		"origin",
-		target.source.fetchURL,
+		target.source.FetchURL,
 	})
 }
 
-func (f *realSourceFetcher) updateTargetContents(ctx context.Context, target *target) error {
+func (f *realSourcesSyncer) updateTargetContents(ctx context.Context, target *target) error {
 	if err := runGitCommand(ctx, target.folder, append(
 		target.source.fetchFlags,
 		"fetch",
@@ -111,13 +95,13 @@ func (f *realSourceFetcher) updateTargetContents(ctx context.Context, target *ta
 	})
 }
 
-func (f *realSourceFetcher) updateTargetMetadata(ctx context.Context, target *target) error {
+func (f *realSourcesSyncer) updateTargetMetadata(ctx context.Context, target *target) error {
 	errs := []error{
-		runGitCommand(ctx, target.folder, []string{"config", "set", "gitweb.url", target.source.fetchURL}),
+		runGitCommand(ctx, target.folder, []string{"config", "set", "gitweb.url", target.source.FetchURL}),
 		// This allows the remote branches to show up in the summary page's HEADS section.
 		runGitCommand(ctx, target.folder, []string{"config", "set", "gitweb.extraBranchRefs", "remotes"}),
 	}
-	if desc := target.source.description; desc != "" {
+	if desc := target.source.Description; desc != "" {
 		errs = append(errs, os.WriteFile(filepath.Join(target.folder, "description"), []byte(desc), 0644))
 	}
 	return errors.Join(errs...)

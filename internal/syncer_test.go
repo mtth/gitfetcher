@@ -11,25 +11,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSourceFetcher(t *testing.T) {
+func TestSyncSources(t *testing.T) {
 	ctx := context.Background()
 	t0 := time.UnixMilli(3600_000)
 	t1 := time.UnixMilli(4800_000)
 
 	for key, tc := range map[string]func(*testing.T, map[string]time.Time, fmt.Stringer){
 		"no sources": func(t *testing.T, _ map[string]time.Time, _ fmt.Stringer) {
-			fetcher := &realSourceFetcher{"/tmp", inlineSources(nil)}
-			err := fetcher.FetchSources(ctx)
+			err := SyncSources(ctx, "/tmp", nil)
 			require.NoError(t, err)
 		},
 		"single missing source": func(t *testing.T, _ map[string]time.Time, out fmt.Stringer) {
-			fetcher := &realSourceFetcher{"/tmp", inlineSources([]*source{{
-				name:          "cool/test",
-				fetchURL:      "http://example.com/test",
+			err := SyncSources(ctx, "/tmp", []*Source{{
+				Name:          "cool/test",
+				FetchURL:      "http://example.com/test",
 				defaultBranch: "main",
-				lastUpdatedAt: t0,
-			}})}
-			err := fetcher.FetchSources(ctx)
+				LastUpdatedAt: t0,
+			}})
 			require.NoError(t, err)
 			assert.Equal(t, []string{
 				"init --bare -b main",
@@ -43,18 +41,17 @@ func TestSourceFetcher(t *testing.T) {
 		"stale and up-to-date sources": func(t *testing.T, times map[string]time.Time, out fmt.Stringer) {
 			times["/tmp/cool/stale.git"] = t0
 			times["/tmp/cool/up-to-date.git"] = t0
-			fetcher := &realSourceFetcher{"/tmp", inlineSources([]*source{{
-				name:          "cool/stale",
-				fetchURL:      "http://example.com/stale",
+			err := SyncSources(ctx, "/tmp", []*Source{{
+				Name:          "cool/stale",
+				FetchURL:      "http://example.com/stale",
 				defaultBranch: "main",
-				lastUpdatedAt: t1,
+				LastUpdatedAt: t1,
 			}, {
-				name:          "cool/up-to-date",
-				fetchURL:      "http://example.com/up-to-date",
+				Name:          "cool/up-to-date",
+				FetchURL:      "http://example.com/up-to-date",
 				defaultBranch: "main",
-				lastUpdatedAt: t0,
-			}})}
-			err := fetcher.FetchSources(ctx)
+				LastUpdatedAt: t0,
+			}})
 			require.NoError(t, err)
 			assert.Equal(t, []string{
 				"fetch --all",
@@ -82,10 +79,4 @@ func TestSourceFetcher(t *testing.T) {
 			tc(t, ts, &b)
 		})
 	}
-}
-
-type inlineSources []*source
-
-func (f inlineSources) findSources(context.Context) ([]*source, error) {
-	return ([]*source)(f), nil
 }

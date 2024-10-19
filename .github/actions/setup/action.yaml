@@ -5,6 +5,9 @@ inputs:
     description: Lint sources
     required: false
     default: true
+  token:
+    description: GitHub token
+    required: true
 runs:
   using: composite
   steps:
@@ -12,10 +15,14 @@ runs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.23'
+    - name: Install Protoc
+      uses: arduino/setup-protoc@v3
+      with:
+        repo-token: ${{ inputs.token }}
     - name: Download dependencies
       shell: bash
       run: |
-        go mod download
+        ./scripts/bootstrap.sh
     - name: Build sources
       shell: bash
       run: |

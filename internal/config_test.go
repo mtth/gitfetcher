@@ -4,40 +4,63 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 func TestParseConfig(t *testing.T) {
 	for _, tc := range []struct {
 		path string
-		want Config
+		want *configpb.Config
 	}{
 		{
 			path: "testdata",
-			want: &githubConfig{
-				Sources: []githubSourcesConfig{{Match: "foo/*"}, {Match: "bar/here"}},
+			want: &configpb.Config{
+				Branch: &configpb.Config_Github{
+					Github: &configpb.Github{
+						Sources: []*configpb.GithubSource{{
+							Branch: &configpb.GithubSource_Name{
+								Name: "mtth/gitfetcher",
+							},
+						}, {
+							Branch: &configpb.GithubSource_As{
+								As: &configpb.GithubSource_Authenticated{
+									Token: "$GITHUB_TOKEN",
+								},
+							},
+						}},
+					},
+				},
 			},
 		},
 		{
-			path: "testdata/.gitfetcher.great.yaml",
-			want: &githubConfig{
-				Sources: []githubSourcesConfig{{Match: "great/stuff"}},
+			path: "testdata/.gitfetcher.great",
+			want: &configpb.Config{
+				Branch: &configpb.Config_Github{
+					Github: &configpb.Github{
+						Sources: []*configpb.GithubSource{{
+							Branch: &configpb.GithubSource_Name{
+								Name: "great/stuff",
+							},
+						}},
+					},
+				},
 			},
 		},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			got, err := ParseConfig(tc.path)
 			require.NoError(t, err)
-			assert.EqualValues(t, tc.want, got)
-			assert.Equal(t, "github", got.SourceProvider())
+			assert.Empty(t, cmp.Diff(tc.want, got, protocmp.Transform()))
 		})
 	}
 
 	for _, tc := range []string{
-		"testdata/.gitfetcher.empty.yaml",
-		"testdata/.gitfetcher.empty-github-sources.yaml",
-		"testdata/.gitfetcher.invalid.yaml",
+		"testdata/.gitfetcher.empty",
+		"testdata/.gitfetcher.invalid",
 	} {
 		t.Run(tc, func(t *testing.T) {
 			got, err := ParseConfig(tc)
