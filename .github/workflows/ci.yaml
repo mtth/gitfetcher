@@ -1,38 +1,31 @@
-name: PR
+name: CI
 on:
-  pull_request:
+  push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
 jobs:
-  lint:
-    name: Lint
+  test:
+    name: Test and tag
     timeout-minutes: 4
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - name: Check out
         uses: actions/checkout@v4
       - name: Set up
         uses: ./.github/actions/setup
-  test:
-    name: Test
-    timeout-minutes: 3
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Check out
-        uses: actions/checkout@v4
-      - name: Set up
-        uses: ./.github/actions/setup
-        with:
-          lint: false
       - name: Test
         run: go test ./... -tags test -coverpkg=./... -coverprofile=coverage.out -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Bump version and create tag
+        id: bump-version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
