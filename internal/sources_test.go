@@ -59,7 +59,8 @@ func TestFindSources_Github(t *testing.T) {
 					Sources: []*configpb.GithubSource{{
 						Branch: &configpb.GithubSource_Auth{
 							Auth: &configpb.GithubSource_TokenAuth{
-								Token: "$SOURCES_GITHUB_TOKEN",
+								Token:   "$SOURCES_GITHUB_TOKEN",
+								Filters: []string{"**"},
 							},
 						},
 					}},

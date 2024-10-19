@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gobwas/glob"
 	"github.com/google/go-github/v66/github"
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 )
@@ -105,9 +106,9 @@ func (c *githubSourceFinder) addSourceNamed(
 func (c *githubSourceFinder) addAuthenticatedSources(
 	ctx context.Context,
 	builder *githubSourcesBuilder,
-	as *configpb.GithubSource_TokenAuth,
+	auth *configpb.GithubSource_TokenAuth,
 ) error {
-	token := as.GetToken()
+	token := auth.GetToken()
 	if suffix, ok := strings.CutPrefix(token, "$"); ok {
 		token = os.Getenv(suffix)
 	}
@@ -116,6 +117,15 @@ func (c *githubSourceFinder) addAuthenticatedSources(
 	flags := []string{
 		"-c",
 		fmt.Sprintf("credential.helper=!f() { echo username=token; echo password=%v; };f", token),
+	}
+
+	var globs []glob.Glob
+	for _, filter := range auth.GetFilters() {
+		compiled, err := glob.Compile(filter)
+		if err != nil {
+			return err
+		}
+		globs = append(globs, compiled)
 	}
 
 	opts := &github.RepositoryListByAuthenticatedUserOptions{
@@ -127,10 +137,12 @@ func (c *githubSourceFinder) addAuthenticatedSources(
 			return fmt.Errorf("%w: %w", errInvalidGithubToken, err)
 		}
 		for _, repo := range repos {
-			if repo.GetFork() && !as.GetIncludeForks() {
+			if repo.GetFork() && !auth.GetIncludeForks() {
 				continue
 			}
-			builder.add(repo, flags)
+			if matchesGlobs(repo.GetName(), globs) {
+				builder.add(repo, flags)
+			}
 		}
 		if res.NextPage == 0 {
 			break
@@ -138,4 +150,16 @@ func (c *githubSourceFinder) addAuthenticatedSources(
 		opts.Page = res.NextPage
 	}
 	return nil
+}
+
+func matchesGlobs(name string, globs []glob.Glob) bool {
+	if len(globs) == 0 {
+		return true
+	}
+	for _, g := range globs {
+		if g.Match(name) {
+			return true
+		}
+	}
+	return false
 }
