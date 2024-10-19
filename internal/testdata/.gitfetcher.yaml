@@ -1,0 +1,4 @@
+github:
+  sources:
+    - match: foo/*
+    - match: bar/here

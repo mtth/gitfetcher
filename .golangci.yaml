@@ -1,0 +1,101 @@
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+  forbidigo:
+    forbid:
+      - '^fmt\.Print'
+  govet:
+    enable:
+      - nilness
+    disable:
+      - composites
+  gosec:
+    excludes:
+      - G306
+  grouper:
+    import-require-single-import: true
+  nakedret:
+    max-func-lines: 50
+  nolintlint:
+    require-specific: true
+  testifylint:
+    disable:
+      - require-error
+linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - decorder
+    - dogsled
+    - dupword
+    - durationcheck
+    - err113
+    - errcheck
+    - errchkjson
+    - errname
+    - exhaustive
+    - forbidigo
+    - forcetypeassert
+    - gci
+    - gocheckcompilerdirectives
+    - gochecksumtype
+    - goconst
+    - godot
+    - gofmt
+    - goheader
+    - goimports
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - gosmopolitan
+    - govet
+    - grouper
+    - importas
+    - ineffassign
+    - loggercheck
+    - makezero
+    - mirror
+    - misspell
+    - musttag
+    - nakedret
+    - nestif
+    - nilerr
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - perfsprint
+    - predeclared
+    - promlinter
+    - reassign
+    - revive
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
+    - stylecheck
+    - testifylint
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+    - zerologlint
+issues:
+  exclude-rules:
+    - linters:
+        - err113
+        - errcheck
+        - forcetypeassert
+        - goconst
+        - gosec
+        - perfsprint
+        - revive
+      path: .*_test\.go|.*[/_]testonly.go
