@@ -80,3 +80,45 @@ func TestSyncSources(t *testing.T) {
 		})
 	}
 }
+
+func TestFileModTime(t *testing.T) {
+	t.Run("missing", func(t *testing.T) {
+		got := fileModTime("./non/existent")
+		assert.True(t, got.IsZero())
+	})
+
+	t.Run("directory", func(t *testing.T) {
+		got := fileModTime(".")
+		assert.False(t, got.IsZero())
+	})
+}
+
+func TestTargetModTime(t *testing.T) {
+	got := targetModTime(&target{folder: "./missing"})
+	assert.True(t, got.IsZero())
+}
+
+func TestRunCommand(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("executable not found", func(t *testing.T) {
+		err := runCommand(ctx, ".", "non-existent", nil)
+		require.ErrorContains(t, err, "not found")
+	})
+
+	t.Run("OK invocation", func(t *testing.T) {
+		err := runCommand(ctx, ".", "echo", []string{"bar"})
+		require.NoError(t, err)
+	})
+
+	t.Run("failed invocation", func(t *testing.T) {
+		err := runCommand(ctx, ".", "false", nil)
+		require.ErrorContains(t, err, "exit")
+	})
+}
+
+func TestRunGitCommand(t *testing.T) {
+	ctx := context.Background()
+	got := runGitCommand(ctx, ".", []string{"status"})
+	require.NoError(t, got)
+}
