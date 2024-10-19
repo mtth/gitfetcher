@@ -1,4 +1,4 @@
 github {
   sources { name: "mtth/gitfetcher" }
-  sources { as { token: "$GITHUB_TOKEN" }}
+  sources { auth { token: "$GITHUB_TOKEN" }}
 }

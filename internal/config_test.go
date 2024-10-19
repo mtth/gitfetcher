@@ -26,8 +26,8 @@ func TestParseConfig(t *testing.T) {
 								Name: "mtth/gitfetcher",
 							},
 						}, {
-							Branch: &configpb.GithubSource_As{
-								As: &configpb.GithubSource_Authenticated{
+							Branch: &configpb.GithubSource_Auth{
+								Auth: &configpb.GithubSource_TokenAuth{
 									Token: "$GITHUB_TOKEN",
 								},
 							},

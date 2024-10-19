@@ -4,6 +4,7 @@ package gitfetcher.config;
 
 option go_package = "github.com/mtth/gitfetcher/configpb_gen;configpb";
 
+// Overall fetching configuration.
 message Config {
   oneof branch {
     Github github = 1;
@@ -11,17 +12,25 @@ message Config {
 }
 
 message Github {
+  // Information about which repositories to fetch.
   repeated GithubSource sources = 1;
 }
 
 message GithubSource {
   oneof branch {
+    // The name of the repository to fetch, for example `golang/go`.
     string name = 1;
-    Authenticated as = 2;
+
+    // Authentication information used to fetch multiple repositories. This
+    // allows fetching private repositories.
+    TokenAuth auth = 2;
   }
 
-  message Authenticated {
+  message TokenAuth {
+    // GitHub authentication token with repository read access.
     string token = 1;
+
+    // Whether to fetch forks (by default they are skipped).
     bool include_forks = 2;
   }
 }

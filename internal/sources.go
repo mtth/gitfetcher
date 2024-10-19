@@ -76,8 +76,8 @@ func (c *githubSourceFinder) findSources(ctx context.Context) ([]*Source, error)
 				errs = append(errs, err)
 				slog.Error("Unable to add named source.", slog.Any("err", err))
 			}
-		case *configpb.GithubSource_As:
-			if err := c.addAuthenticatedSources(ctx, &builder, b.As); err != nil {
+		case *configpb.GithubSource_Auth:
+			if err := c.addAuthenticatedSources(ctx, &builder, b.Auth); err != nil {
 				errs = append(errs, err)
 				slog.Error("Unable to add authenticated sources.", slog.Any("err", err))
 			}
@@ -105,7 +105,7 @@ func (c *githubSourceFinder) addSourceNamed(
 func (c *githubSourceFinder) addAuthenticatedSources(
 	ctx context.Context,
 	builder *githubSourcesBuilder,
-	as *configpb.GithubSource_Authenticated,
+	as *configpb.GithubSource_TokenAuth,
 ) error {
 	token := as.GetToken()
 	if suffix, ok := strings.CutPrefix(token, "$"); ok {

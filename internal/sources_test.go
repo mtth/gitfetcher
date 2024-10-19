@@ -35,8 +35,8 @@ func TestFindSources_Github(t *testing.T) {
 			Branch: &configpb.Config_Github{
 				Github: &configpb.Github{
 					Sources: []*configpb.GithubSource{{
-						Branch: &configpb.GithubSource_As{
-							As: &configpb.GithubSource_Authenticated{
+						Branch: &configpb.GithubSource_Auth{
+							Auth: &configpb.GithubSource_TokenAuth{
 								Token: "abc",
 							},
 						},
@@ -57,8 +57,8 @@ func TestFindSources_Github(t *testing.T) {
 			Branch: &configpb.Config_Github{
 				Github: &configpb.Github{
 					Sources: []*configpb.GithubSource{{
-						Branch: &configpb.GithubSource_As{
-							As: &configpb.GithubSource_Authenticated{
+						Branch: &configpb.GithubSource_Auth{
+							Auth: &configpb.GithubSource_TokenAuth{
 								Token: "$SOURCES_GITHUB_TOKEN",
 							},
 						},
