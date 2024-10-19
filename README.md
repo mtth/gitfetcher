@@ -1,4 +1,4 @@
-# Git fetcher
+# Git fetcher [![codecov](https://codecov.io/gh/mtth/gitfetcher/graph/badge.svg?token=N1B8C8UMX0)](https://codecov.io/gh/mtth/gitfetcher)
 
 > [!NOTE]
 > WIP: this library is usable but its API may change in breaking ways.
