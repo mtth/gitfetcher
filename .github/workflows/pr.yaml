@@ -16,6 +16,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Set up
         uses: ./.github/actions/setup
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
   test:
     name: Test
     timeout-minutes: 3
@@ -30,6 +32,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           lint: false
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Test
         run: go test ./... -tags test -coverpkg=./... -coverprofile=coverage.out -covermode=atomic
         env:
