@@ -47,7 +47,7 @@ func main() {
 				return err
 			}
 			for _, src := range srcs {
-				fmt.Printf("%s\t%s\n", src.Name, src.FetchURL)
+				fmt.Printf("%s\t%s\n", src.Name, src.FetchURL) //nolint:forbidigo
 			}
 			return nil
 		},

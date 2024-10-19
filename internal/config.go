@@ -10,9 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"google.golang.org/protobuf/encoding/prototext"
-
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
+	"google.golang.org/protobuf/encoding/prototext"
 )
 
 const defaultName = ".gitfetcher"

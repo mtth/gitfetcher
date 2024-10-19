@@ -27,7 +27,7 @@ func TestFindSources_Github(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Len(t, srcs, 1)
-		assert.Equal(t, srcs[0].Name, "mtth/gitfetcher")
+		assert.Equal(t, "mtth/gitfetcher", srcs[0].Name)
 	})
 
 	t.Run("invalid token", func(t *testing.T) {

@@ -80,9 +80,3 @@ func TestSyncSources(t *testing.T) {
 		})
 	}
 }
-
-type inlineSources []*Source
-
-func (f inlineSources) findSources(context.Context) ([]*Source, error) {
-	return ([]*Source)(f), nil
-}
