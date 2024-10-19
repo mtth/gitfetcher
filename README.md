@@ -1,20 +1,20 @@
 # Git fetcher
 
 > [!NOTE]
-> WIP
+> WIP: this library is usable but its API may change in breaking ways.
 
-A simple binary to create local copies of remote repositories.
+A lightweight tool to create local copies of remote repositories.
 
 Highlights:
 
-* Single-file configuration
-* `gitweb`-compatible clones
-* Automation-friendly
+* Simple file-based configuration
+* `gitweb`-compatible local repositories
+* Automation-friendly, including secret handling
 
 
 ## Quickstart
 
-Sample configuration:
+Sample configuration in [`txtpb` format][txtpb]:
 
 ```txtpb
 # .gitfetcher
@@ -26,8 +26,8 @@ github {
   # Sync all repositories available to a given authentication token.
   sources {
     auth {
-      token: "$GITHUB_TOKEN"
-      include_forks: false # This is the default, and can be overridden.
+      token: "$GITHUB_TOKEN" # Read from the environment at runtime
+      include_forks: false # This is the default, and can be overridden
     }
   }
 
@@ -36,3 +36,6 @@ github {
 ```
 
 Then run `gitfetcher sync .` in the folder containing the above configuration.
+
+
+[txtpb]: https://protobuf.dev/reference/protobuf/textformat-spec/
