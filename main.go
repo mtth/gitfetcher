@@ -17,7 +17,7 @@ func main() {
 		Use:   "sync PATH",
 		Short: "Sync repositories",
 		Args:  cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			root := args[0]
 			config, err := gitfetcher.ParseConfig(cmp.Or(configPath, root))
 			if err != nil {
@@ -37,5 +37,6 @@ func main() {
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file.")
 	rootCmd.AddCommand(syncCmd)
-	rootCmd.Execute()
+
+	_ = rootCmd.ExecuteContext(ctx)
 }
