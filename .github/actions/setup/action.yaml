@@ -1,0 +1,29 @@
+name: Setup
+description: Common setup steps
+inputs:
+  lint:
+    description: Lint sources
+    required: false
+    default: true
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+    - name: Download dependencies
+      shell: bash
+      run: |
+        go mod download
+    - name: Build sources
+      shell: bash
+      run: |
+        mkdir bin
+        go build -o ./bin main.go
+    - name: Lint Go
+      if: inputs.lint == 'true'
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: v1.61.0
+        args: --build-tags test --timeout=240s --verbose

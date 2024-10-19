@@ -1,0 +1,32 @@
+name: PR
+on:
+  pull_request:
+    branches:
+      - main
+jobs:
+  lint:
+    name: Lint
+    timeout-minutes: 4
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+      - name: Set up
+        uses: ./.github/actions/setup
+  test:
+    name: Test
+    timeout-minutes: 3
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+      - name: Set up
+        uses: ./.github/actions/setup
+        with:
+          lint: false

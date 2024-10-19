@@ -51,8 +51,6 @@ type target struct {
 	source *source
 }
 
-var errUnexpectedSourceStatus = errors.New("unexpected source status")
-
 func (f *realSourceFetcher) syncSource(ctx context.Context, src *source) error {
 	target := &target{
 		source: src,
