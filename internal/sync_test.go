@@ -93,6 +93,11 @@ func TestFileModTime(t *testing.T) {
 	})
 }
 
+func TestTargetModTime(t *testing.T) {
+	got := targetModTime(&target{folder: "./missing"})
+	assert.True(t, got.IsZero())
+}
+
 func TestRunCommand(t *testing.T) {
 	ctx := context.Background()
 
@@ -110,4 +115,10 @@ func TestRunCommand(t *testing.T) {
 		err := runCommand(ctx, ".", "false", nil)
 		require.ErrorContains(t, err, "exit")
 	})
+}
+
+func TestRunGitCommand(t *testing.T) {
+	ctx := context.Background()
+	got := runGitCommand(ctx, ".", []string{"status"})
+	require.NoError(t, got)
 }
