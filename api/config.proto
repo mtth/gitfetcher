@@ -32,5 +32,10 @@ message GithubSource {
 
     // Whether to fetch forks (by default they are skipped).
     bool include_forks = 2;
+
+    // List of glob patterns used to filter fetched repositories by name. If
+    // unset, all names are eligible. Globs follow standard wildcards:
+    // https://tldp.org/LDP/GNU-Linux-Tools-Summary/html/x11655.htm
+    repeated string filters = 3;
   }
 }
