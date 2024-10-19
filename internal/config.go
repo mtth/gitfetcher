@@ -1,43 +1,28 @@
 // Package gitfetcher creates local mirrors from remote git repositories.
 package gitfetcher
 
+//go:generate mkdir -p configpb_gen
+//go:generate protoc --proto_path=../api ../api/config.proto --go_out=configpb_gen --go_opt=paths=source_relative
+
 import (
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
+	"google.golang.org/protobuf/encoding/prototext"
+
+	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 )
 
-type Config interface {
-	SourceProvider() string
-}
-
-const defaultName = ".gitfetcher.yaml"
-
-type githubConfig struct {
-	Sources []githubSourcesConfig `yaml:"sources"`
-}
-
-func (c *githubConfig) SourceProvider() string {
-	return "github"
-}
-
-type githubSourcesConfig struct {
-	Match string `yaml:"match"`
-}
-
-type configProduct struct {
-	Github *githubConfig `yaml:"github"`
-}
+const defaultName = ".gitfetcher"
 
 var (
 	ErrMissingConfig = errors.New("missing configuration")
 	ErrInvalidConfig = errors.New("invalid configuration")
 )
 
-func ParseConfig(fp string) (Config, error) {
+func ParseConfig(fp string) (*configpb.Config, error) {
 	info, err := os.Stat(fp)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrMissingConfig, err)
@@ -49,15 +34,12 @@ func ParseConfig(fp string) (Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrMissingConfig, err)
 	}
-	var prod configProduct
-	if err := yaml.Unmarshal(data, &prod); err != nil {
+	var cfg configpb.Config
+	if err := prototext.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidConfig, err)
 	}
-	if prod.Github != nil {
-		if len(prod.Github.Sources) == 0 {
-			return nil, fmt.Errorf("%w: empty GitHub sources", ErrInvalidConfig)
-		}
-		return prod.Github, nil
+	if cfg.GetBranch() == nil {
+		return nil, fmt.Errorf("%w: empty contents", ErrInvalidConfig)
 	}
-	return nil, fmt.Errorf("%w: empty contents", ErrInvalidConfig)
+	return &cfg, nil
 }

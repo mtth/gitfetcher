@@ -4,91 +4,138 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v66/github"
+	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 )
 
-// source captures information about a repository to be mirrored.
-type source struct {
-	name, fetchURL, description, defaultBranch string
+// Source captures information about a repository to be mirrored.
+type Source struct {
+	Name, FetchURL, Description, defaultBranch string
 	fetchFlags                                 []string
-	lastUpdatedAt                              time.Time
+	LastUpdatedAt                              time.Time
 }
 
-// sourceFinder retrieves source metadata.
-type sourceFinder interface {
-	findSources(ctx context.Context) ([]*source, error)
+// FindSources returns all sources for the provided configuration.
+func FindSources(ctx context.Context, cfg *configpb.Config) ([]*Source, error) {
+	var finder sourcesFinder
+	switch b := cfg.GetBranch().(type) {
+	case *configpb.Config_Github:
+		finder = &githubSourceFinder{client: github.NewClient(nil), config: b.Github}
+	default:
+		return nil, fmt.Errorf("%w: %v", errUnexpectedConfig, cfg)
+	}
+	return finder.findSources(ctx)
 }
 
-var getenv = os.Getenv
+// sourcesFinder retrieves Source metadata.
+type sourcesFinder interface {
+	findSources(ctx context.Context) ([]*Source, error)
+}
 
 var (
-	errMissingGithubToken = errors.New("missing or empty GITHUB_TOKEN environment variable")
 	errInvalidGithubToken = errors.New("invalid GitHub token")
 	errUnexpectedConfig   = errors.New("unexpected config")
 )
 
-// newSourceFinder creates a sourceFinder for the provided configuration.
-func newSourceFinder(cfg Config) (sourceFinder, error) {
-	switch c := cfg.(type) {
-	case *githubConfig:
-		token := getenv("GITHUB_TOKEN")
-		if token == "" {
-			return nil, errMissingGithubToken
-		}
-		return &githubSourceFinder{
-			config: c,
-			github: github.NewClient(nil).WithAuthToken(token),
-			token:  token,
-		}, nil
-	default:
-		return nil, fmt.Errorf("%w: %v", errUnexpectedConfig, cfg)
-	}
-}
-
-// githubSourceFinder is a GitHub-backed sourceFinder implementation.
+// githubSourceFinder is a GitHub-backed sourcesFinder implementation.
 type githubSourceFinder struct {
-	config *githubConfig
-	github *github.Client
-	token  string
+	client *github.Client
+	config *configpb.Github
 }
 
-// findSources implements sourceFinder.
-func (c *githubSourceFinder) findSources(ctx context.Context) ([]*source, error) {
+type githubSourcesBuilder []*Source
+
+func (b *githubSourcesBuilder) add(repo *github.Repository, flags []string) {
+	*b = append(*b, &Source{
+		Name:          repo.GetFullName(),
+		FetchURL:      repo.GetCloneURL(),
+		Description:   repo.GetDescription(),
+		fetchFlags:    flags,
+		defaultBranch: repo.GetDefaultBranch(),
+		LastUpdatedAt: repo.GetUpdatedAt().Time,
+	})
+}
+
+func (b *githubSourcesBuilder) build() []*Source {
+	return ([]*Source)(*b)
+}
+
+// findSources implements sourcesFinder.
+func (c *githubSourceFinder) findSources(ctx context.Context) ([]*Source, error) {
+	var errs []error
+	var builder githubSourcesBuilder
+	for _, cfg := range c.config.Sources {
+		switch b := cfg.GetBranch().(type) {
+		case *configpb.GithubSource_Name:
+			if err := c.addSourceNamed(ctx, &builder, b.Name); err != nil {
+				errs = append(errs, err)
+				slog.Error("Unable to add named source.", slog.Any("err", err))
+			}
+		case *configpb.GithubSource_As:
+			if err := c.addAuthenticatedSources(ctx, &builder, b.As); err != nil {
+				errs = append(errs, err)
+				slog.Error("Unable to add authenticated sources.", slog.Any("err", err))
+			}
+		default:
+			return nil, errUnexpectedConfig
+		}
+	}
+	return builder.build(), errors.Join(errs...)
+}
+
+func (c *githubSourceFinder) addSourceNamed(
+	ctx context.Context,
+	builder *githubSourcesBuilder,
+	name string,
+) error {
+	parts := strings.SplitN(name, "/", 2)
+	repo, _, err := c.client.Repositories.Get(ctx, parts[0], parts[1])
+	if err != nil {
+		return err
+	}
+	builder.add(repo, nil)
+	return nil
+}
+
+func (c *githubSourceFinder) addAuthenticatedSources(
+	ctx context.Context,
+	builder *githubSourcesBuilder,
+	as *configpb.GithubSource_Authenticated,
+) error {
+	token := as.GetToken()
+	if suffix, ok := strings.CutPrefix(token, "$"); ok {
+		token = os.Getenv(suffix)
+	}
+
+	client := c.client.WithAuthToken(token)
 	flags := []string{
 		"-c",
-		fmt.Sprintf("credential.helper=!f() { echo username=token; echo password=%v; };f", c.token),
+		fmt.Sprintf("credential.helper=!f() { echo username=token; echo password=%v; };f", token),
 	}
 
-	var srcs []*source
 	opts := &github.RepositoryListByAuthenticatedUserOptions{
 		ListOptions: github.ListOptions{PerPage: 50},
 	}
 	for {
-		repos, res, err := c.github.Repositories.ListByAuthenticatedUser(ctx, opts)
+		repos, res, err := client.Repositories.ListByAuthenticatedUser(ctx, opts)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w", errInvalidGithubToken, err)
+			return fmt.Errorf("%w: %w", errInvalidGithubToken, err)
 		}
 		for _, repo := range repos {
-			if repo.GetFork() {
+			if repo.GetFork() && !as.GetIncludeForks() {
 				continue
 			}
-			srcs = append(srcs, &source{
-				name:          repo.GetFullName(),
-				fetchURL:      repo.GetCloneURL(),
-				fetchFlags:    flags,
-				defaultBranch: repo.GetDefaultBranch(),
-				description:   repo.GetDescription(),
-				lastUpdatedAt: repo.GetUpdatedAt().Time,
-			})
+			builder.add(repo, flags)
 		}
 		if res.NextPage == 0 {
 			break
 		}
 		opts.Page = res.NextPage
 	}
-
-	return srcs, nil
+	return nil
 }

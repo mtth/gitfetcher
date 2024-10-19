@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package gitfetcher.config;
+
+option go_package = "github.com/mtth/gitfetcher/configpb_gen;configpb";
+
+message Config {
+  oneof branch {
+    Github github = 1;
+  }
+}
+
+message Github {
+  repeated GithubSource sources = 1;
+}
+
+message GithubSource {
+  oneof branch {
+    string name = 1;
+    Authenticated as = 2;
+  }
+
+  message Authenticated {
+    string token = 1;
+    bool include_forks = 2;
+  }
+}

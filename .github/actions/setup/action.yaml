@@ -16,6 +16,10 @@ runs:
       shell: bash
       run: |
         go mod download
+    - name: Generate sources
+      shell: bash
+      run: |
+        go generate ./...
     - name: Build sources
       shell: bash
       run: |
