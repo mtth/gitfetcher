@@ -26,11 +26,7 @@ runs:
     - name: Download dependencies
       shell: bash
       run: |
-        go mod download
-    - name: Generate sources
-      shell: bash
-      run: |
-        go generate ./...
+        ./scripts/bootstrap.sh
     - name: Build sources
       shell: bash
       run: |
