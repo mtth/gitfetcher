@@ -71,3 +71,25 @@ func TestFindSources_Github(t *testing.T) {
 		assert.NotEmpty(t, srcs)
 	})
 }
+
+func TestNamePredicate(t *testing.T) {
+	t.Run("invalid", func(t *testing.T) {
+		got, err := newNamePredicate([]string{"["})
+		assert.Nil(t, got)
+		assert.ErrorContains(t, err, "end of input")
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		got, err := newNamePredicate(nil)
+		require.NoError(t, err)
+		assert.True(t, got.accept(""))
+	})
+
+	t.Run("glob", func(t *testing.T) {
+		got, err := newNamePredicate([]string{"foo/*"})
+		require.NoError(t, err)
+		assert.True(t, got.accept("foo/bar"))
+		assert.True(t, got.accept("foo/.baz"))
+		assert.False(t, got.accept("bar/baz"))
+	})
+}

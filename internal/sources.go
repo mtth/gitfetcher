@@ -119,13 +119,9 @@ func (c *githubSourceFinder) addAuthenticatedSources(
 		fmt.Sprintf("credential.helper=!f() { echo username=token; echo password=%v; };f", token),
 	}
 
-	var globs []glob.Glob
-	for _, filter := range auth.GetFilters() {
-		compiled, err := glob.Compile(filter)
-		if err != nil {
-			return err
-		}
-		globs = append(globs, compiled)
+	pred, err := newNamePredicate(auth.GetFilters())
+	if err != nil {
+		return err
 	}
 
 	opts := &github.RepositoryListByAuthenticatedUserOptions{
@@ -140,7 +136,7 @@ func (c *githubSourceFinder) addAuthenticatedSources(
 			if repo.GetFork() && !auth.GetIncludeForks() {
 				continue
 			}
-			if matchesGlobs(repo.GetName(), globs) {
+			if pred.accept(repo.GetName()) {
 				builder.add(repo, flags)
 			}
 		}
@@ -152,11 +148,25 @@ func (c *githubSourceFinder) addAuthenticatedSources(
 	return nil
 }
 
-func matchesGlobs(name string, globs []glob.Glob) bool {
-	if len(globs) == 0 {
+type namePredicate []glob.Glob
+
+func newNamePredicate(pats []string) (namePredicate, error) {
+	var globs []glob.Glob
+	for _, filter := range pats {
+		compiled, err := glob.Compile(filter)
+		if err != nil {
+			return nil, err
+		}
+		globs = append(globs, compiled)
+	}
+	return namePredicate(globs), nil
+}
+
+func (p namePredicate) accept(name string) bool {
+	if len(p) == 0 {
 		return true
 	}
-	for _, g := range globs {
+	for _, g := range p {
 		if g.Match(name) {
 			return true
 		}
