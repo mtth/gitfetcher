@@ -81,6 +81,20 @@ func TestSync(t *testing.T) {
 	}
 }
 
+func TestGetSyncStatus(t *testing.T) {
+	t0 := time.UnixMilli(3600_000)
+
+	t.Run("missing source", func(t *testing.T) {
+		got := GetSyncStatus("/tmp", &Source{
+			Name:          "cool/test",
+			FetchURL:      "http://example.com/test",
+			defaultBranch: "main",
+			LastUpdatedAt: t0,
+		})
+		assert.Equal(t, SyncStatusAbsent, got)
+	})
+}
+
 func TestFileModTime(t *testing.T) {
 	t.Run("missing", func(t *testing.T) {
 		got := fileModTime("./non/existent")

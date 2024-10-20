@@ -25,6 +25,7 @@ func Sync(ctx context.Context, root string, srcs []*Source) error {
 	return errors.Join(errs...)
 }
 
+// GetSyncStatus returns the current SyncStatus of a source.
 func GetSyncStatus(root string, src *Source) SyncStatus {
 	lastSyncedAt := repoModTime(repoRoot(root, src))
 	if lastSyncedAt.IsZero() {

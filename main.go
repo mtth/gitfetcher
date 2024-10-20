@@ -1,3 +1,4 @@
+// Package main implements the gitfetcher CLI.
 package main
 
 import (
@@ -47,13 +48,14 @@ func main() {
 				return err
 			}
 			for _, src := range srcs {
-				fmt.Printf("%s\t%s\n", src.Name, src.FetchURL) //nolint:forbidigo
+				status := gitfetcher.GetSyncStatus(root, src)
+				fmt.Printf("%v\t%s\t%s\n", status, src.Name, src.FetchURL) //nolint:forbidigo
 			}
 			return nil
 		},
 	}
 
-	rootCmd := &cobra.Command{Use: "gitfetcher"}
+	rootCmd := &cobra.Command{Use: "gitfetcher", SilenceUsage: true}
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to configuration file.")
 	rootCmd.AddCommand(syncCmd, showCmd)
