@@ -12,21 +12,45 @@ import (
 	"time"
 )
 
-func SyncSources(ctx context.Context, root string, srcs []*Source) error {
-	syncer := &realSourcesSyncer{root}
+// Sync syncs local copies in the root folder of each source. Missing local repositories will be
+// created, others will be updated as needed.
+func Sync(ctx context.Context, root string, srcs []*Source) error {
+	syncer := &sourcesSyncer{root}
 	var errs []error
 	for _, src := range srcs {
-		attrs := slog.Group("data", slog.String("name", src.Name), slog.String("url", src.FetchURL))
 		if err := syncer.syncSource(ctx, src); err != nil {
-			slog.Error("Unable to sync source.", attrs, slog.Any("err", err))
-		} else {
-			slog.Info("Synced source.", attrs)
+			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
 }
 
-type realSourcesSyncer struct {
+// GetSyncStatus returns the current SyncStatus of a source.
+func GetSyncStatus(root string, src *Source) SyncStatus {
+	lastSyncedAt := repoModTime(repoRoot(root, src))
+	if lastSyncedAt.IsZero() {
+		return SyncStatusAbsent
+	}
+	if lastSyncedAt.Before(src.LastUpdatedAt) {
+		return SyncStatusStale
+	}
+	return SyncStatusFresh
+}
+
+func repoRoot(root string, src *Source) string {
+	return filepath.Join(root, src.Name) + ".git"
+}
+
+type SyncStatus int
+
+//go:generate go run github.com/dmarkham/enumer -type=SyncStatus -trimprefix SyncStatus -transform snake-upper
+const (
+	SyncStatusAbsent SyncStatus = iota
+	SyncStatusStale
+	SyncStatusFresh
+)
+
+type sourcesSyncer struct {
 	root string
 }
 
@@ -35,13 +59,16 @@ type target struct {
 	source *Source
 }
 
-func (f *realSourcesSyncer) syncSource(ctx context.Context, src *Source) error {
+func (f *sourcesSyncer) syncSource(ctx context.Context, src *Source) error {
+	attrs := dataAttrs(slog.String("name", src.Name))
+	slog.Debug("Syncing source...", attrs)
+
 	target := &target{
 		source: src,
-		folder: filepath.Join(f.root, src.Name) + ".git",
+		folder: repoRoot(f.root, src),
 	}
 
-	lastSyncedAt := targetModTime(target)
+	lastSyncedAt := repoModTime(target.folder)
 	if lastSyncedAt.IsZero() {
 		if err := f.createTarget(ctx, target); err != nil {
 			return err
@@ -52,10 +79,12 @@ func (f *realSourcesSyncer) syncSource(ctx context.Context, src *Source) error {
 			return err
 		}
 	}
-	return f.updateTargetMetadata(ctx, target)
+	err := f.updateTargetMetadata(ctx, target)
+	slog.Info("Synced source.", attrs, errAttr(err))
+	return err
 }
 
-func (f *realSourcesSyncer) createTarget(ctx context.Context, target *target) error {
+func (f *sourcesSyncer) createTarget(ctx context.Context, target *target) error {
 	if err := os.MkdirAll(target.folder, 0755); err != nil {
 		return err
 	}
@@ -69,17 +98,21 @@ func (f *realSourcesSyncer) createTarget(ctx context.Context, target *target) er
 	}); err != nil {
 		return err
 	}
-	return runGitCommand(ctx, target.folder, []string{
+	if err := runGitCommand(ctx, target.folder, []string{
 		"remote",
 		"add",
 		"-m",
 		target.source.defaultBranch,
 		"origin",
 		target.source.FetchURL,
-	})
+	}); err != nil {
+		return err
+	}
+	slog.Debug("Created target repository.", dataAttrs(slog.String("path", target.folder)))
+	return nil
 }
 
-func (f *realSourcesSyncer) updateTargetContents(ctx context.Context, target *target) error {
+func (f *sourcesSyncer) updateTargetContents(ctx context.Context, target *target) error {
 	if err := runGitCommand(ctx, target.folder, append(
 		target.source.fetchFlags,
 		"fetch",
@@ -88,14 +121,18 @@ func (f *realSourcesSyncer) updateTargetContents(ctx context.Context, target *ta
 		return err
 	}
 	// Update HEAD so that gitweb shows the most recent commit.
-	return runGitCommand(ctx, target.folder, []string{
+	if err := runGitCommand(ctx, target.folder, []string{
 		"update-ref",
 		"refs/heads/HEAD",
 		fmt.Sprintf("refs/remotes/origin/%v", target.source.defaultBranch),
-	})
+	}); err != nil {
+		return err
+	}
+	slog.Debug("Updated target repository contents.", dataAttrs(slog.String("path", target.folder)))
+	return nil
 }
 
-func (f *realSourcesSyncer) updateTargetMetadata(ctx context.Context, target *target) error {
+func (f *sourcesSyncer) updateTargetMetadata(ctx context.Context, target *target) error {
 	errs := []error{
 		runGitCommand(ctx, target.folder, []string{"config", "set", "gitweb.url", target.source.FetchURL}),
 		// This allows the remote branches to show up in the summary page's HEADS section.
@@ -104,12 +141,14 @@ func (f *realSourcesSyncer) updateTargetMetadata(ctx context.Context, target *ta
 	if desc := target.source.Description; desc != "" {
 		errs = append(errs, os.WriteFile(filepath.Join(target.folder, "description"), []byte(desc), 0644))
 	}
-	return errors.Join(errs...)
+	err := errors.Join(errs...)
+	slog.Debug("Updated target repository medatada.", dataAttrs(slog.String("path", target.folder)))
+	return err
 }
 
 var (
-	targetModTime = func(tgt *target) time.Time {
-		return fileModTime(filepath.Join(tgt.folder, "refs/heads"))
+	repoModTime = func(fp string) time.Time {
+		return fileModTime(filepath.Join(fp, "refs/heads"))
 	}
 	runGitCommand = func(ctx context.Context, cwd string, args []string) error {
 		return runCommand(ctx, cwd, "git", args)
