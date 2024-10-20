@@ -19,9 +19,9 @@ Highlights:
 go install github.com/mtth/gitfetcher
 ```
 
-Sample configuration in [`txtpb` format][txtpb]:
+Sample configuration ([`txtpb` format][txtpb]):
 
-```txtpb
+```pbtxt
 # .gitfetcher
 github {
   # Sync any public repository by name.
@@ -52,6 +52,7 @@ github {
 ```
 
 Then run `gitfetcher sync .` in the folder containing the above configuration.
+See `gitfetcher --help` for the full list of available commands and options.
 
 
 [txtpb]: https://protobuf.dev/reference/protobuf/textformat-spec/

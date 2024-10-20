@@ -33,9 +33,9 @@ func main() {
 		},
 	}
 
-	showCmd := &cobra.Command{
-		Use:   "show PATH",
-		Short: "Show repositories",
+	statusCmd := &cobra.Command{
+		Use:   "status PATH",
+		Short: "Show repository statuses",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			root := args[0]
@@ -58,7 +58,7 @@ func main() {
 	rootCmd := &cobra.Command{Use: "gitfetcher", SilenceUsage: true}
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to configuration file.")
-	rootCmd.AddCommand(syncCmd, showCmd)
+	rootCmd.AddCommand(syncCmd, statusCmd)
 
 	_ = rootCmd.ExecuteContext(ctx)
 }

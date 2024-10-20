@@ -41,6 +41,7 @@ func repoRoot(root string, src *Source) string {
 	return filepath.Join(root, src.Name) + ".git"
 }
 
+// SyncStatus captures possible states of the local repository vs its remote.
 type SyncStatus int
 
 //go:generate go run github.com/dmarkham/enumer -type=SyncStatus -trimprefix SyncStatus -transform snake-upper
