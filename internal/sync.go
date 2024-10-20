@@ -97,16 +97,18 @@ func (f *sourcesSyncer) createTarget(ctx context.Context, target *target) error 
 	}); err != nil {
 		return err
 	}
-	err := runGitCommand(ctx, target.folder, []string{
+	if err := runGitCommand(ctx, target.folder, []string{
 		"remote",
 		"add",
 		"-m",
 		target.source.defaultBranch,
 		"origin",
 		target.source.FetchURL,
-	})
-	// slog.Debug(
-	return err
+	}); err != nil {
+		return err
+	}
+	slog.Debug("Created target repository.", dataAttrs(slog.String("path", target.folder)))
+	return nil
 }
 
 func (f *sourcesSyncer) updateTargetContents(ctx context.Context, target *target) error {
@@ -118,11 +120,15 @@ func (f *sourcesSyncer) updateTargetContents(ctx context.Context, target *target
 		return err
 	}
 	// Update HEAD so that gitweb shows the most recent commit.
-	return runGitCommand(ctx, target.folder, []string{
+	if err := runGitCommand(ctx, target.folder, []string{
 		"update-ref",
 		"refs/heads/HEAD",
 		fmt.Sprintf("refs/remotes/origin/%v", target.source.defaultBranch),
-	})
+	}); err != nil {
+		return err
+	}
+	slog.Debug("Updated target repository contents.", dataAttrs(slog.String("path", target.folder)))
+	return nil
 }
 
 func (f *sourcesSyncer) updateTargetMetadata(ctx context.Context, target *target) error {
@@ -134,7 +140,9 @@ func (f *sourcesSyncer) updateTargetMetadata(ctx context.Context, target *target
 	if desc := target.source.Description; desc != "" {
 		errs = append(errs, os.WriteFile(filepath.Join(target.folder, "description"), []byte(desc), 0644))
 	}
-	return errors.Join(errs...)
+	err := errors.Join(errs...)
+	slog.Debug("Updated target repository medatada.", dataAttrs(slog.String("path", target.folder)))
+	return err
 }
 
 var (
