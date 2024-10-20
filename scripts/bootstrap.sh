@@ -30,6 +30,7 @@ main() {
 	shift $(( OPTIND-1 ))
 
 	go mod download
+	go install google.golang.org/protobuf/cmd/protoc-gen-go
 	go generate ./...
 }
 
