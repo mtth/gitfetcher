@@ -65,7 +65,7 @@ func TestParseConfig(t *testing.T) {
 		t.Run(tc, func(t *testing.T) {
 			got, err := ParseConfig(tc)
 			assert.Nil(t, got)
-			require.ErrorIs(t, err, ErrInvalidConfig)
+			require.ErrorIs(t, err, errInvalidConfig)
 		})
 	}
 
@@ -76,7 +76,7 @@ func TestParseConfig(t *testing.T) {
 		t.Run(fmt.Sprintf("missing %s", key), func(t *testing.T) {
 			got, err := ParseConfig(tc)
 			assert.Nil(t, got)
-			require.ErrorIs(t, err, ErrMissingConfig)
+			require.ErrorIs(t, err, errMissingConfig)
 		})
 	}
 }

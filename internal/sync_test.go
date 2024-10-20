@@ -11,18 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSyncSources(t *testing.T) {
+func TestSync(t *testing.T) {
 	ctx := context.Background()
 	t0 := time.UnixMilli(3600_000)
 	t1 := time.UnixMilli(4800_000)
 
 	for key, tc := range map[string]func(*testing.T, map[string]time.Time, fmt.Stringer){
 		"no sources": func(t *testing.T, _ map[string]time.Time, _ fmt.Stringer) {
-			err := SyncSources(ctx, "/tmp", nil)
+			err := Sync(ctx, "/tmp", nil)
 			require.NoError(t, err)
 		},
 		"single missing source": func(t *testing.T, _ map[string]time.Time, out fmt.Stringer) {
-			err := SyncSources(ctx, "/tmp", []*Source{{
+			err := Sync(ctx, "/tmp", []*Source{{
 				Name:          "cool/test",
 				FetchURL:      "http://example.com/test",
 				defaultBranch: "main",
@@ -41,7 +41,7 @@ func TestSyncSources(t *testing.T) {
 		"stale and up-to-date sources": func(t *testing.T, times map[string]time.Time, out fmt.Stringer) {
 			times["/tmp/cool/stale.git"] = t0
 			times["/tmp/cool/up-to-date.git"] = t0
-			err := SyncSources(ctx, "/tmp", []*Source{{
+			err := Sync(ctx, "/tmp", []*Source{{
 				Name:          "cool/stale",
 				FetchURL:      "http://example.com/stale",
 				defaultBranch: "main",
@@ -72,8 +72,8 @@ func TestSyncSources(t *testing.T) {
 			})()
 
 			ts := make(map[string]time.Time)
-			defer swap(&targetModTime, func(tgt *target) time.Time {
-				return ts[tgt.folder]
+			defer swap(&repoModTime, func(fp string) time.Time {
+				return ts[fp]
 			})()
 
 			tc(t, ts, &b)
@@ -94,7 +94,7 @@ func TestFileModTime(t *testing.T) {
 }
 
 func TestTargetModTime(t *testing.T) {
-	got := targetModTime(&target{folder: "./missing"})
+	got := repoModTime("./missing")
 	assert.True(t, got.IsZero())
 }
 

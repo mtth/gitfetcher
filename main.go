@@ -28,12 +28,12 @@ func main() {
 			if err != nil {
 				return err
 			}
-			return gitfetcher.SyncSources(ctx, root, srcs)
+			return gitfetcher.Sync(ctx, root, srcs)
 		},
 	}
 
 	showCmd := &cobra.Command{
-		Use:   "show [PATH]",
+		Use:   "show PATH",
 		Short: "Show repositories",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {

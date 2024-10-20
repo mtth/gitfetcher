@@ -23,6 +23,8 @@ type Source struct {
 
 // FindSources returns all sources for the provided configuration.
 func FindSources(ctx context.Context, cfg *configpb.Config) ([]*Source, error) {
+	slog.Debug("Finding sources...")
+
 	var finder sourcesFinder
 	switch b := cfg.GetBranch().(type) {
 	case *configpb.Config_Github:
@@ -30,7 +32,10 @@ func FindSources(ctx context.Context, cfg *configpb.Config) ([]*Source, error) {
 	default:
 		return nil, fmt.Errorf("%w: %v", errUnexpectedConfig, cfg)
 	}
-	return finder.findSources(ctx)
+
+	srcs, err := finder.findSources(ctx)
+	slog.Info(fmt.Sprintf("Found %v source(s).", len(srcs)), errAttr(err))
+	return srcs, err
 }
 
 // sourcesFinder retrieves Source metadata.
@@ -75,12 +80,10 @@ func (c *githubSourceFinder) findSources(ctx context.Context) ([]*Source, error)
 		case *configpb.GithubSource_Name:
 			if err := c.addSourceNamed(ctx, &builder, b.Name); err != nil {
 				errs = append(errs, err)
-				slog.Error("Unable to add named source.", slog.Any("err", err))
 			}
 		case *configpb.GithubSource_Auth:
 			if err := c.addAuthenticatedSources(ctx, &builder, b.Auth); err != nil {
 				errs = append(errs, err)
-				slog.Error("Unable to add authenticated sources.", slog.Any("err", err))
 			}
 		default:
 			return nil, errUnexpectedConfig
@@ -97,9 +100,10 @@ func (c *githubSourceFinder) addSourceNamed(
 	parts := strings.SplitN(name, "/", 2)
 	repo, _, err := c.client.Repositories.Get(ctx, parts[0], parts[1])
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to get source named %s: %w", name, err)
 	}
 	builder.add(repo, nil)
+	slog.Debug("Added named source.", dataAttrs(slog.String("name", name)))
 	return nil
 }
 
@@ -127,24 +131,29 @@ func (c *githubSourceFinder) addAuthenticatedSources(
 	opts := &github.RepositoryListByAuthenticatedUserOptions{
 		ListOptions: github.ListOptions{PerPage: 50},
 	}
+	var added, skipped int
 	for {
 		repos, res, err := client.Repositories.ListByAuthenticatedUser(ctx, opts)
 		if err != nil {
 			return fmt.Errorf("%w: %w", errInvalidGithubToken, err)
 		}
 		for _, repo := range repos {
-			if repo.GetFork() && !auth.GetIncludeForks() {
+			if (repo.GetFork() && !auth.GetIncludeForks()) || !pred.accept(repo.GetName()) {
+				skipped++
 				continue
 			}
-			if pred.accept(repo.GetName()) {
-				builder.add(repo, flags)
-			}
+			builder.add(repo, flags)
+			added++
 		}
 		if res.NextPage == 0 {
 			break
 		}
 		opts.Page = res.NextPage
 	}
+	slog.Debug(
+		"Added authenticated source.",
+		dataAttrs(slog.Int("added", added), slog.Int("skipped", skipped)),
+	)
 	return nil
 }
 

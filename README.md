@@ -1,9 +1,9 @@
 # Git fetcher [![codecov](https://codecov.io/gh/mtth/gitfetcher/graph/badge.svg?token=N1B8C8UMX0)](https://codecov.io/gh/mtth/gitfetcher)
 
 > [!NOTE]
-> WIP: this library is usable but its API may change in breaking ways.
+> WIP: this tool is usable but its API may change in breaking ways.
 
-A lightweight tool to create local copies of remote repositories.
+A lightweight CLI to create local copies of remote repositories.
 
 Highlights:
 
@@ -14,6 +14,11 @@ Highlights:
 
 ## Quickstart
 
+
+```sh
+go install github.com/mtth/gitfetcher
+```
+
 Sample configuration in [`txtpb` format][txtpb]:
 
 ```txtpb
@@ -21,13 +26,24 @@ Sample configuration in [`txtpb` format][txtpb]:
 github {
   # Sync any public repository by name.
   sources { name: "golang/go" }
-  sources { name: "mtth/gitfetcher" }
+  sources { name: "nodejs/node" }
 
-  # Sync all repositories available to a given authentication token.
+  # Sync repositories available to a given authentication token. This is useful
+  # for example to sync all your personal repos.
   sources {
     auth {
-      token: "$GITHUB_TOKEN" # Read from the environment at runtime
-      include_forks: false # This is the default, and can be overridden
+      # A token with read access to repositories is required. It can either be
+      # specified inline or via an environment variable (prefixing it with `$`).
+      token: "$GITHUB_TOKEN"
+
+      # Forks are excluded by default and can be included using via this option.
+      # include_forks: true
+
+      # It's also possible to filter by repository name by specifying one or
+      # more filters, optionally including wildcards. A repository will be
+      # synced if it matches at least one.
+      # filters: "user/*"
+      # filters: "user/prefix*"
     }
   }
 
