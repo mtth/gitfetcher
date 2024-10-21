@@ -34,6 +34,7 @@ func TestParseConfig(t *testing.T) {
 						}},
 					},
 				},
+				Root: "testdata",
 			},
 		},
 		{
@@ -48,6 +49,7 @@ func TestParseConfig(t *testing.T) {
 						}},
 					},
 				},
+				Root: "testdata",
 			},
 		},
 	} {
