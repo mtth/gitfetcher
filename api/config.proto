@@ -6,8 +6,11 @@ option go_package = "github.com/mtth/gitfetcher/configpb_gen;configpb";
 
 // Overall fetching configuration.
 message Config {
+  // Path to root folder, defaults to the configuration's enclosing directory.
+  string root = 1;
+
   oneof branch {
-    Github github = 1;
+    Github github = 2;
   }
 }
 

@@ -19,10 +19,9 @@ Highlights:
 go install github.com/mtth/gitfetcher
 ```
 
-Sample configuration ([`txtpb` format][txtpb]):
+Sample `.gitfetcher` configuration ([`txtpb` format][txtpb]):
 
 ```pbtxt
-# .gitfetcher
 github {
   # Sync any public repository by name.
   sources { name: "golang/go" }
@@ -49,9 +48,13 @@ github {
 
   # More sources...
 }
+
+# Path to root folder where local repositories will be stored, relative to the
+# configuration file. Defaults to the configuration's enclosing directory.
+# root: "/path/to/.gitfetcher"
 ```
 
-Then run `gitfetcher sync .` in the folder containing the above configuration.
+Then run `gitfetcher sync` in the folder containing the above configuration.
 See `gitfetcher --help` for the full list of available commands and options.
 
 
