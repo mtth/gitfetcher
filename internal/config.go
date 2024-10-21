@@ -15,6 +15,8 @@ import (
 	"google.golang.org/protobuf/encoding/prototext"
 )
 
+type Config = configpb.Config
+
 const defaultName = ".gitfetcher"
 
 var (
@@ -24,6 +26,7 @@ var (
 
 // ParseConfig returns a parsed configuration from a given path. The path may either point to a
 // configuration file or a folder, in which case the default configuration file name will be used.
+// The configuration's root will be automatically populated.
 func ParseConfig(fp string) (*configpb.Config, error) {
 	slog.Debug("Reading config...", dataAttrs(slog.String("path", fp)))
 
@@ -46,6 +49,9 @@ func ParseConfig(fp string) (*configpb.Config, error) {
 		return nil, fmt.Errorf("%w: empty contents", errInvalidConfig)
 	}
 
-	slog.Info("Read config.", dataAttrs(slog.String("path", fp)))
+	if !filepath.IsAbs(cfg.GetRoot()) {
+		cfg.Root = filepath.Join(filepath.Dir(fp), cfg.Root)
+	}
+	slog.Info("Read config.", dataAttrs(slog.String("path", fp), slog.String("root", cfg.GetRoot())))
 	return &cfg, nil
 }

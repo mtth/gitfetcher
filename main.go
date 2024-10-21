@@ -2,7 +2,6 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 
@@ -13,42 +12,38 @@ import (
 func main() {
 	ctx := context.Background()
 
-	var configPath string
-
 	syncCmd := &cobra.Command{
-		Use:   "sync PATH",
+		Use:   "sync [PATH]",
 		Short: "Sync repositories",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			root := args[0]
-			config, err := gitfetcher.ParseConfig(cmp.Or(configPath, root))
+			cfg, err := loadConfig(args)
 			if err != nil {
 				return err
 			}
-			srcs, err := gitfetcher.FindSources(ctx, config)
+			srcs, err := gitfetcher.FindSources(ctx, cfg)
 			if err != nil {
 				return err
 			}
-			return gitfetcher.Sync(ctx, root, srcs)
+			return gitfetcher.Sync(ctx, cfg.GetRoot(), srcs)
 		},
 	}
 
 	statusCmd := &cobra.Command{
-		Use:   "status PATH",
+		Use:   "status [PATH]",
 		Short: "Show repository statuses",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			root := args[0]
-			config, err := gitfetcher.ParseConfig(cmp.Or(configPath, root))
+			cfg, err := loadConfig(args)
 			if err != nil {
 				return err
 			}
-			srcs, err := gitfetcher.FindSources(ctx, config)
+			srcs, err := gitfetcher.FindSources(ctx, cfg)
 			if err != nil {
 				return err
 			}
 			for _, src := range srcs {
-				status := gitfetcher.GetSyncStatus(root, src)
+				status := gitfetcher.GetSyncStatus(cfg.GetRoot(), src)
 				fmt.Printf("%v\t%s\t%s\n", status, src.Name, src.FetchURL) //nolint:forbidigo
 			}
 			return nil
@@ -57,8 +52,15 @@ func main() {
 
 	rootCmd := &cobra.Command{Use: "gitfetcher", SilenceUsage: true}
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
-	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to configuration file.")
 	rootCmd.AddCommand(syncCmd, statusCmd)
 
 	_ = rootCmd.ExecuteContext(ctx)
+}
+
+func loadConfig(args []string) (*gitfetcher.Config, error) {
+	fp := "."
+	if len(args) > 0 {
+		fp = args[0]
+	}
+	return gitfetcher.ParseConfig(fp)
 }
