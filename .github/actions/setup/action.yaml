@@ -1,6 +1,10 @@
 name: Setup
 description: Common setup steps
 inputs:
+  build:
+    description: Build sources
+    required: false
+    default: true
   lint:
     description: Lint sources
     required: false
@@ -24,6 +28,7 @@ runs:
       run: |
         ./scripts/bootstrap.sh
     - name: Build sources
+      if: inputs.build == 'true'
       shell: bash
       run: |
         mkdir bin

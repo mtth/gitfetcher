@@ -1,0 +1,68 @@
+name: Release
+on:
+  # schedule:
+  #   - cron: '5 */8 * * *'
+  workflow_dispatch: {}
+jobs:
+  create:
+    name: Maybe create release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release-tag: ${{ steps.get-tags.outputs.release-tag }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          # We need both options to get all tags. See
+          # https://github.com/actions/checkout/issues/1471
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Get latest semver tag
+        id: get-tags
+        run: |
+          release_tag="$(git describe --tags --match="v[0-9]*" --abbrev=0 HEAD || :)"
+          if [[ -n $release_tag ]] && ! gh release view "$release_tag"; then
+            echo "release-tag=$release_tag" >>"$GITHUB_OUTPUT"
+            baseline_tag="$(gh release list --json tagName -L 1 -q '.[].tagName')"
+            echo "baseline-tag=${baseline_tag:-v0.1.0}" >>"$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create release
+        if: steps.get-tags.outputs.release-tag != ''
+        # https://stackoverflow.com/a/75679739
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --generate-notes \
+            --notes-start-tag="$BASELINE_TAG"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.get-tags.outputs.release-tag }}
+          BASELINE_TAG: ${{ steps.get-tags.outputs.baseline-tag }}
+  decorate:
+    name: Decorate release
+    runs-on: ubuntu-latest
+    needs: [create]
+    if: needs.create.outputs.release-tag != ''
+    permissions:
+      contents: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create.outputs.release-tag }}
+      - name: Set up
+        uses: ./.github/actions/setup
+        with:
+          build: false
+          lint: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add binary
+        uses: wangyoucao577/go-release-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: linux
+          goarch: amd64
+          release_tag: ${{ needs.create.outputs.release-tag }}
