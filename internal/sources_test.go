@@ -15,15 +15,13 @@ func TestFindSources_Github(t *testing.T) {
 
 	t.Run("single named repo", func(t *testing.T) {
 		srcs, err := FindSources(ctx, &configpb.Config{
-			Branch: &configpb.Config_Github{
-				Github: &configpb.Github{
-					Sources: []*configpb.GithubSource{{
-						Branch: &configpb.GithubSource_Name{
-							Name: "mtth/gitfetcher",
-						},
-					}},
+			Sources: []*configpb.Source{{
+				Branch: &configpb.Source_FromUrl{
+					FromUrl: &configpb.UrlSource{
+						Url: "https://github.com/mtth/gitfetcher",
+					},
 				},
-			},
+			}},
 		})
 		require.NoError(t, err)
 		assert.Len(t, srcs, 1)
@@ -32,17 +30,13 @@ func TestFindSources_Github(t *testing.T) {
 
 	t.Run("invalid token", func(t *testing.T) {
 		srcs, err := FindSources(ctx, &configpb.Config{
-			Branch: &configpb.Config_Github{
-				Github: &configpb.Github{
-					Sources: []*configpb.GithubSource{{
-						Branch: &configpb.GithubSource_Auth{
-							Auth: &configpb.GithubSource_TokenAuth{
-								Token: "abc",
-							},
-						},
-					}},
+			Sources: []*configpb.Source{{
+				Branch: &configpb.Source_FromGithubToken{
+					FromGithubToken: &configpb.GithubTokenSource{
+						Token: "abc",
+					},
 				},
-			},
+			}},
 		})
 		assert.Nil(t, srcs)
 		assert.ErrorIs(t, err, errInvalidGithubToken)
@@ -54,18 +48,13 @@ func TestFindSources_Github(t *testing.T) {
 		}
 
 		srcs, err := FindSources(ctx, &configpb.Config{
-			Branch: &configpb.Config_Github{
-				Github: &configpb.Github{
-					Sources: []*configpb.GithubSource{{
-						Branch: &configpb.GithubSource_Auth{
-							Auth: &configpb.GithubSource_TokenAuth{
-								Token:   "$SOURCES_GITHUB_TOKEN",
-								Filters: []string{"**"},
-							},
-						},
-					}},
+			Sources: []*configpb.Source{{
+				Branch: &configpb.Source_FromGithubToken{
+					FromGithubToken: &configpb.GithubTokenSource{
+						Token: "$SOURCES_GITHUB_TOKEN",
+					},
 				},
-			},
+			}},
 		})
 		require.NoError(t, err)
 		assert.NotEmpty(t, srcs)

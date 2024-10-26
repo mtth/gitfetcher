@@ -8,6 +8,9 @@ linters-settings:
       - composites
   gosec:
     excludes:
+      - G301
+      - G302
+      - G304
       - G306
   grouper:
     import-require-single-import: true

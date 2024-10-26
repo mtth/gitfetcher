@@ -95,7 +95,7 @@ func (f *sourcesSyncer) createTarget(ctx context.Context, target *target) error 
 		"init",
 		"--bare",
 		"-b",
-		target.source.defaultBranch,
+		target.source.DefaultBranch,
 	}); err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (f *sourcesSyncer) createTarget(ctx context.Context, target *target) error 
 		"remote",
 		"add",
 		"-m",
-		target.source.defaultBranch,
+		target.source.DefaultBranch,
 		"origin",
 		target.source.FetchURL,
 	}); err != nil {
@@ -125,7 +125,7 @@ func (f *sourcesSyncer) updateTargetContents(ctx context.Context, target *target
 	if err := runGitCommand(ctx, target.folder, []string{
 		"update-ref",
 		"refs/heads/HEAD",
-		fmt.Sprintf("refs/remotes/origin/%v", target.source.defaultBranch),
+		fmt.Sprintf("refs/remotes/origin/%v", target.source.DefaultBranch),
 	}); err != nil {
 		return err
 	}

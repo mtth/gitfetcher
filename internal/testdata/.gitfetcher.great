@@ -1,5 +1,6 @@
-github {
-  sources {
-    name: "great/stuff"
+sources {
+  from_github_token {
+    token: "secret-token"
+    filters: "foo/*"
   }
 }

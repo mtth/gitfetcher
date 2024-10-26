@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/encoding/prototext"
 )
 
+// Config is the generated configuration type, exported here for use in helper signatures.
 type Config = configpb.Config
 
 const defaultName = ".gitfetcher"
@@ -45,7 +46,7 @@ func ParseConfig(fp string) (*configpb.Config, error) {
 	if err := prototext.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("%w: %v", errInvalidConfig, err)
 	}
-	if cfg.GetBranch() == nil {
+	if len(cfg.GetSources()) == 0 {
 		return nil, fmt.Errorf("%w: empty contents", errInvalidConfig)
 	}
 
