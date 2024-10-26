@@ -19,36 +19,33 @@ func TestParseConfig(t *testing.T) {
 		{
 			path: "testdata",
 			want: &configpb.Config{
-				Branch: &configpb.Config_Github{
-					Github: &configpb.Github{
-						Sources: []*configpb.GithubSource{{
-							Branch: &configpb.GithubSource_Name{
-								Name: "mtth/gitfetcher",
-							},
-						}, {
-							Branch: &configpb.GithubSource_Auth{
-								Auth: &configpb.GithubSource_TokenAuth{
-									Token: "$GITHUB_TOKEN",
-								},
-							},
-						}},
+				Root: "testdata/projects",
+				Sources: []*configpb.Source{{
+					Branch: &configpb.Source_FromUrl{
+						FromUrl: &configpb.UrlSource{
+							Url: "https://github.com/mtth/gitfetcher",
+						},
 					},
-				},
-				Root: "testdata",
+				}, {
+					Branch: &configpb.Source_FromGithubToken{
+						FromGithubToken: &configpb.GithubTokenSource{
+							Token: "$GITHUB_TOKEN",
+						},
+					},
+				}},
 			},
 		},
 		{
-			path: "testdata/.gitfetcher.great",
+			path: "testdata/.gitfetcher.great.conf",
 			want: &configpb.Config{
-				Branch: &configpb.Config_Github{
-					Github: &configpb.Github{
-						Sources: []*configpb.GithubSource{{
-							Branch: &configpb.GithubSource_Name{
-								Name: "great/stuff",
-							},
-						}},
+				Sources: []*configpb.Source{{
+					Branch: &configpb.Source_FromGithubToken{
+						FromGithubToken: &configpb.GithubTokenSource{
+							Token:   "secret-token",
+							Filters: []string{"foo/*"},
+						},
 					},
-				},
+				}},
 				Root: "testdata",
 			},
 		},
@@ -61,8 +58,8 @@ func TestParseConfig(t *testing.T) {
 	}
 
 	for _, tc := range []string{
-		"testdata/.gitfetcher.empty",
-		"testdata/.gitfetcher.invalid",
+		"testdata/.gitfetcher.empty.conf",
+		"testdata/.gitfetcher.invalid.conf",
 	} {
 		t.Run(tc, func(t *testing.T) {
 			got, err := ParseConfig(tc)

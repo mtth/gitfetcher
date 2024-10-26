@@ -1,5 +1,0 @@
-github {
-  sources {
-    name: "great/stuff"
-  }
-}

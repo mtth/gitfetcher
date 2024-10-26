@@ -25,7 +25,7 @@ func TestSync(t *testing.T) {
 			err := Sync(ctx, "/tmp", []*Source{{
 				Name:          "cool/test",
 				FetchURL:      "http://example.com/test",
-				defaultBranch: "main",
+				DefaultBranch: "main",
 				LastUpdatedAt: t0,
 			}})
 			require.NoError(t, err)
@@ -44,12 +44,12 @@ func TestSync(t *testing.T) {
 			err := Sync(ctx, "/tmp", []*Source{{
 				Name:          "cool/stale",
 				FetchURL:      "http://example.com/stale",
-				defaultBranch: "main",
+				DefaultBranch: "main",
 				LastUpdatedAt: t1,
 			}, {
 				Name:          "cool/up-to-date",
 				FetchURL:      "http://example.com/up-to-date",
-				defaultBranch: "main",
+				DefaultBranch: "main",
 				LastUpdatedAt: t0,
 			}})
 			require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestGetSyncStatus(t *testing.T) {
 		got := GetSyncStatus("/tmp", &Source{
 			Name:          "cool/test",
 			FetchURL:      "http://example.com/test",
-			defaultBranch: "main",
+			DefaultBranch: "main",
 			LastUpdatedAt: t0,
 		})
 		assert.Equal(t, SyncStatusAbsent, got)

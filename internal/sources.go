@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,114 +17,103 @@ import (
 
 // Source captures information about a repository to be mirrored.
 type Source struct {
-	Name, FetchURL, Description, defaultBranch string
-	fetchFlags                                 []string
+	Name, FetchURL, Description, DefaultBranch string
 	LastUpdatedAt                              time.Time
+	fetchFlags                                 []string
 }
 
 // FindSources returns all sources for the provided configuration.
 func FindSources(ctx context.Context, cfg *configpb.Config) ([]*Source, error) {
 	slog.Debug("Finding sources...")
 
-	var finder sourcesFinder
-	switch b := cfg.GetBranch().(type) {
-	case *configpb.Config_Github:
-		finder = &githubSourceFinder{client: github.NewClient(nil), config: b.Github}
-	default:
-		return nil, fmt.Errorf("%w: %v", errUnexpectedConfig, cfg)
+	var builder sourcesBuilder
+	finder := &sourceFinder{builder: &builder, githubClient: github.NewClient(nil)}
+
+	var errs []error
+	for _, src := range cfg.GetSources() {
+		var err error
+		switch b := src.GetBranch().(type) {
+		case *configpb.Source_FromUrl:
+			err = finder.findURLSource(ctx, b.FromUrl)
+		case *configpb.Source_FromGithubToken:
+			err = finder.findGithubTokenSources(ctx, b.FromGithubToken)
+		default:
+			return nil, fmt.Errorf("%w: %v", errUnexpectedConfig, cfg)
+		}
+		errs = append(errs, err)
 	}
 
-	srcs, err := finder.findSources(ctx)
+	srcs := builder.build()
+	err := errors.Join(errs...)
 	slog.Info(fmt.Sprintf("Found %v source(s).", len(srcs)), errAttr(err))
 	return srcs, err
 }
 
-// sourcesFinder retrieves Source metadata.
-type sourcesFinder interface {
-	findSources(ctx context.Context) ([]*Source, error)
-}
+type sourcesBuilder []*Source
 
-var (
-	errInvalidGithubToken = errors.New("invalid GitHub token")
-	errUnexpectedConfig   = errors.New("unexpected config")
-)
-
-// githubSourceFinder is a GitHub-backed sourcesFinder implementation.
-type githubSourceFinder struct {
-	client *github.Client
-	config *configpb.Github
-}
-
-type githubSourcesBuilder []*Source
-
-func (b *githubSourcesBuilder) add(repo *github.Repository, flags []string) {
+func (b *sourcesBuilder) addGithubRepo(repo *github.Repository, flags []string) {
 	*b = append(*b, &Source{
 		Name:          repo.GetFullName(),
 		FetchURL:      repo.GetCloneURL(),
 		Description:   repo.GetDescription(),
 		fetchFlags:    flags,
-		defaultBranch: repo.GetDefaultBranch(),
+		DefaultBranch: repo.GetDefaultBranch(),
 		LastUpdatedAt: repo.GetUpdatedAt().Time,
 	})
 }
 
-func (b *githubSourcesBuilder) build() []*Source {
+func (b *sourcesBuilder) build() []*Source {
 	return ([]*Source)(*b)
 }
 
-// findSources implements sourcesFinder.
-func (c *githubSourceFinder) findSources(ctx context.Context) ([]*Source, error) {
-	var errs []error
-	var builder githubSourcesBuilder
-	for _, cfg := range c.config.Sources {
-		switch b := cfg.GetBranch().(type) {
-		case *configpb.GithubSource_Name:
-			if err := c.addSourceNamed(ctx, &builder, b.Name); err != nil {
-				errs = append(errs, err)
-			}
-		case *configpb.GithubSource_Auth:
-			if err := c.addAuthenticatedSources(ctx, &builder, b.Auth); err != nil {
-				errs = append(errs, err)
-			}
-		default:
-			return nil, errUnexpectedConfig
-		}
-	}
-	return builder.build(), errors.Join(errs...)
+var (
+	errInvalidGithubToken = errors.New("invalid GitHub token")
+	errUnexpectedConfig   = errors.New("unexpected config")
+	errUnsupportedURL     = errors.New("unsupported URL")
+)
+
+// sourceFinder is a GitHub-backed sourcesFinder implementation.
+type sourceFinder struct {
+	builder      *sourcesBuilder
+	githubClient *github.Client
 }
 
-func (c *githubSourceFinder) addSourceNamed(
+var githubURLPattern = regexp.MustCompile(`^https://github.com/([^/]+)/([^/]+)/?$`)
+
+func (c *sourceFinder) findURLSource(
 	ctx context.Context,
-	builder *githubSourcesBuilder,
-	name string,
+	cfg *configpb.UrlSource,
 ) error {
-	parts := strings.SplitN(name, "/", 2)
-	repo, _, err := c.client.Repositories.Get(ctx, parts[0], parts[1])
-	if err != nil {
-		return fmt.Errorf("unable to get source named %s: %w", name, err)
+	url := cfg.GetUrl()
+	matches := githubURLPattern.FindStringSubmatch(url)
+	if matches == nil {
+		return fmt.Errorf("%w: %s", errUnsupportedURL, url)
 	}
-	builder.add(repo, nil)
-	slog.Debug("Added named source.", dataAttrs(slog.String("name", name)))
+	repo, _, err := c.githubClient.Repositories.Get(ctx, matches[1], matches[2])
+	if err != nil {
+		return fmt.Errorf("unable to get source from URL %s: %w", url, err)
+	}
+	c.builder.addGithubRepo(repo, nil)
+	slog.Debug("Added URL source.", dataAttrs(slog.String("url", url)))
 	return nil
 }
 
-func (c *githubSourceFinder) addAuthenticatedSources(
+func (c *sourceFinder) findGithubTokenSources(
 	ctx context.Context,
-	builder *githubSourcesBuilder,
-	auth *configpb.GithubSource_TokenAuth,
+	cfg *configpb.GithubTokenSource,
 ) error {
-	token := auth.GetToken()
+	token := cfg.GetToken()
 	if suffix, ok := strings.CutPrefix(token, "$"); ok {
 		token = os.Getenv(suffix)
 	}
 
-	client := c.client.WithAuthToken(token)
+	client := c.githubClient.WithAuthToken(token)
 	flags := []string{
 		"-c",
 		fmt.Sprintf("credential.helper=!f() { echo username=token; echo password=%v; };f", token),
 	}
 
-	pred, err := newNamePredicate(auth.GetFilters())
+	pred, err := newNamePredicate(cfg.GetFilters())
 	if err != nil {
 		return err
 	}
@@ -138,11 +128,11 @@ func (c *githubSourceFinder) addAuthenticatedSources(
 			return fmt.Errorf("%w: %w", errInvalidGithubToken, err)
 		}
 		for _, repo := range repos {
-			if (repo.GetFork() && !auth.GetIncludeForks()) || !pred.accept(repo.GetName()) {
+			if (repo.GetFork() && !cfg.GetIncludeForks()) || !pred.accept(repo.GetName()) {
 				skipped++
 				continue
 			}
-			builder.add(repo, flags)
+			c.builder.addGithubRepo(repo, flags)
 			added++
 		}
 		if res.NextPage == 0 {

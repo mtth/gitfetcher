@@ -9,36 +9,31 @@ message Config {
   // Path to root folder, defaults to the configuration's enclosing directory.
   string root = 1;
 
+  // All repository sources to fetch.
+  repeated Source sources = 2;
+}
+
+message Source {
   oneof branch {
-    Github github = 2;
+    UrlSource from_url = 1;
+    GithubTokenSource from_github_token = 2;
   }
 }
 
-message Github {
-  // Information about which repositories to fetch.
-  repeated GithubSource sources = 1;
+message UrlSource {
+  string url = 1;
 }
 
-message GithubSource {
-  oneof branch {
-    // The name of the repository to fetch, for example `golang/go`.
-    string name = 1;
+message GithubTokenSource {
+  // Authentication information used to fetch multiple repositories. This allows
+  // fetching private repositories.
+  string token = 1;
 
-    // Authentication information used to fetch multiple repositories. This
-    // allows fetching private repositories.
-    TokenAuth auth = 2;
-  }
+  // Whether to fetch forks (by default they are skipped).
+  bool include_forks = 2;
 
-  message TokenAuth {
-    // GitHub authentication token with repository read access.
-    string token = 1;
-
-    // Whether to fetch forks (by default they are skipped).
-    bool include_forks = 2;
-
-    // List of glob patterns used to filter fetched repositories by name. If
-    // unset, all names are eligible. Globs follow standard wildcards:
-    // https://tldp.org/LDP/GNU-Linux-Tools-Summary/html/x11655.htm
-    repeated string filters = 3;
-  }
+  // List of glob patterns used to filter fetched repositories by name. If
+  // unset, all names are eligible. Globs follow standard wildcards:
+  // https://tldp.org/LDP/GNU-Linux-Tools-Summary/html/x11655.htm
+  repeated string filters = 3;
 }
