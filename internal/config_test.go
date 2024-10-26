@@ -36,7 +36,7 @@ func TestParseConfig(t *testing.T) {
 			},
 		},
 		{
-			path: "testdata/.gitfetcher.great",
+			path: "testdata/.gitfetcher.great.conf",
 			want: &configpb.Config{
 				Sources: []*configpb.Source{{
 					Branch: &configpb.Source_FromGithubToken{
@@ -58,8 +58,8 @@ func TestParseConfig(t *testing.T) {
 	}
 
 	for _, tc := range []string{
-		"testdata/.gitfetcher.empty",
-		"testdata/.gitfetcher.invalid",
+		"testdata/.gitfetcher.empty.conf",
+		"testdata/.gitfetcher.invalid.conf",
 	} {
 		t.Run(tc, func(t *testing.T) {
 			got, err := ParseConfig(tc)

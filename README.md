@@ -19,10 +19,10 @@ Highlights:
 go install github.com/mtth/gitfetcher
 ```
 
-Sample `.gitfetcher` configuration ([`txtpb` format][txtpb]):
+Sample `.gitfetcher.conf` configuration ([`txtpb` format][txtpb]):
 
 ```pbtxt
-  # Sync public repositories from their. URL
+  # Sync public repositories from their URL.
 sources { from_url { url: "https://github.com/golang/go" }}
 sources { from_url { url: "https://github.com/nodejs/node" }}
 

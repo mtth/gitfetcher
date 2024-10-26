@@ -18,7 +18,7 @@ import (
 // Config is the generated configuration type, exported here for use in helper signatures.
 type Config = configpb.Config
 
-const defaultName = ".gitfetcher"
+const defaultName = ".gitfetcher.conf"
 
 var (
 	errMissingConfig = errors.New("missing configuration")
