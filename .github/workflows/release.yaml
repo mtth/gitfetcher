@@ -66,3 +66,5 @@ jobs:
           goos: linux
           goarch: amd64
           release_tag: ${{ needs.create.outputs.release-tag }}
+          md5sum: false
+          sha256sum: true
