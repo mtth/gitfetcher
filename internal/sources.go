@@ -128,7 +128,7 @@ func (c *sourceFinder) findGithubTokenSources(
 			return fmt.Errorf("%w: %w", errInvalidGithubToken, err)
 		}
 		for _, repo := range repos {
-			if (repo.GetFork() && !cfg.GetIncludeForks()) || !pred.accept(repo.GetName()) {
+			if (repo.GetFork() && !cfg.GetIncludeForks()) || !pred.accept(repo.GetFullName()) {
 				skipped++
 				continue
 			}
