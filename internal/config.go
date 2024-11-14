@@ -50,9 +50,14 @@ func ParseConfig(fp string) (*configpb.Config, error) {
 		return nil, fmt.Errorf("%w: empty contents", errInvalidConfig)
 	}
 
-	if !filepath.IsAbs(cfg.GetRoot()) {
-		cfg.Root = filepath.Join(filepath.Dir(fp), cfg.Root)
+	root := cfg.GetOptions().GetRoot()
+	if !filepath.IsAbs(root) {
+		if cfg.GetOptions() == nil {
+			cfg.Options = &configpb.Options{}
+		}
+		cfg.Options.Root = filepath.Join(filepath.Dir(fp), root)
 	}
-	slog.Info("Read config.", dataAttrs(slog.String("path", fp), slog.String("root", cfg.GetRoot())))
+
+	slog.Info("Read config.", dataAttrs(slog.String("path", fp), slog.String("root", root)))
 	return &cfg, nil
 }

@@ -25,7 +25,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			return gitfetcher.Sync(ctx, cfg.GetRoot(), srcs)
+			return gitfetcher.Sync(ctx, srcs, cfg.GetOptions())
 		},
 	}
 
@@ -43,7 +43,7 @@ func main() {
 				return err
 			}
 			for _, src := range srcs {
-				status := gitfetcher.GetSyncStatus(cfg.GetRoot(), src)
+				status := gitfetcher.GetSyncStatus(src, cfg.GetOptions())
 				fmt.Printf("%v\t%s\t%s\n", status, src.Name, src.FetchURL) //nolint:forbidigo
 			}
 			return nil

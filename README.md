@@ -47,9 +47,12 @@ sources {
 
 # More sources...
 
-# Path to root folder where local repositories will be stored, relative to the
-# configuration file. Defaults to the configuration's enclosing directory.
-# root: "/path/to/.gitfetcher"
+# Optional settings
+options {
+  # Path to root folder where local repositories will be stored, relative to the
+  # configuration file. Defaults to the configuration's enclosing directory.
+  # root: "/path/to/.gitfetcher"
+}
 ```
 
 Then run `gitfetcher sync` in the folder containing the above configuration.

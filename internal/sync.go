@@ -10,12 +10,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 )
 
 // Sync syncs local copies in the root folder of each source. Missing local repositories will be
 // created, others will be updated as needed.
-func Sync(ctx context.Context, root string, srcs []*Source) error {
-	syncer := &sourcesSyncer{root}
+func Sync(ctx context.Context, srcs []*Source, opts *configpb.Options) error {
+	syncer := &sourcesSyncer{opts}
 	var errs []error
 	for _, src := range srcs {
 		if err := syncer.syncSource(ctx, src); err != nil {
@@ -26,8 +28,9 @@ func Sync(ctx context.Context, root string, srcs []*Source) error {
 }
 
 // GetSyncStatus returns the current SyncStatus of a source.
-func GetSyncStatus(root string, src *Source) SyncStatus {
-	lastSyncedAt := repoModTime(repoRoot(root, src))
+func GetSyncStatus(src *Source, opts *configpb.Options) SyncStatus {
+	target := newTarget(src, opts)
+	lastSyncedAt := targetModTime(target)
 	if lastSyncedAt.IsZero() {
 		return SyncStatusAbsent
 	}
@@ -37,8 +40,16 @@ func GetSyncStatus(root string, src *Source) SyncStatus {
 	return SyncStatusFresh
 }
 
-func repoRoot(root string, src *Source) string {
-	return filepath.Join(root, src.Name) + ".git"
+func isBare(opts *configpb.Options) bool {
+	return opts.GetLayout() == configpb.Options_BARE_LAYOUT
+}
+
+func repoRoot(src *Source, opts *configpb.Options) string {
+	base := filepath.Join(opts.GetRoot(), src.Name)
+	if isBare(opts) {
+		base += ".git"
+	}
+	return base
 }
 
 // SyncStatus captures possible states of the local repository vs its remote.
@@ -52,30 +63,50 @@ const (
 )
 
 type sourcesSyncer struct {
-	root string
+	options *configpb.Options
 }
 
 type target struct {
-	folder string
 	source *Source
+	folder string
+	bare   bool
+}
+
+func newTarget(src *Source, opts *configpb.Options) *target {
+	folder := repoRoot(src, opts)
+	return &target{source: src, folder: folder, bare: isBare(opts)}
+}
+
+func (t *target) trackingRef() string {
+	if t.bare {
+		return "refs/heads/HEAD"
+	}
+	return "refs/remotes/origin/HEAD"
+}
+
+func (t *target) defaultRemoteRef() string {
+	return fmt.Sprintf("refs/remotes/origin/%v", t.source.DefaultBranch)
+}
+
+func (t *target) gitPath(obj string) string {
+	if !t.bare {
+		obj = filepath.Join(".git", obj)
+	}
+	return filepath.Join(t.folder, obj)
 }
 
 func (f *sourcesSyncer) syncSource(ctx context.Context, src *Source) error {
 	attrs := dataAttrs(slog.String("name", src.Name))
 	slog.Debug("Syncing source...", attrs)
 
-	target := &target{
-		source: src,
-		folder: repoRoot(f.root, src),
-	}
-
-	lastSyncedAt := repoModTime(target.folder)
+	target := newTarget(src, f.options)
+	lastSyncedAt := targetModTime(target)
 	if lastSyncedAt.IsZero() {
 		if err := f.createTarget(ctx, target); err != nil {
 			return err
 		}
 	}
-	if lastSyncedAt.Before(src.LastUpdatedAt) {
+	if src.LastUpdatedAt.IsZero() || lastSyncedAt.Before(src.LastUpdatedAt) {
 		if err := f.updateTargetContents(ctx, target); err != nil {
 			return err
 		}
@@ -91,12 +122,11 @@ func (f *sourcesSyncer) createTarget(ctx context.Context, target *target) error 
 	}
 	// We don't use git clone to avoid having the credentials saved in the repo's config and share
 	// more logic with the update function below.
-	if err := runGitCommand(ctx, target.folder, []string{
-		"init",
-		"--bare",
-		"-b",
-		target.source.DefaultBranch,
-	}); err != nil {
+	initArgs := []string{"init", "-b", target.source.DefaultBranch}
+	if isBare(f.options) {
+		initArgs = append(initArgs, "--bare")
+	}
+	if err := runGitCommand(ctx, target.folder, initArgs); err != nil {
 		return err
 	}
 	if err := runGitCommand(ctx, target.folder, []string{
@@ -121,13 +151,31 @@ func (f *sourcesSyncer) updateTargetContents(ctx context.Context, target *target
 	)); err != nil {
 		return err
 	}
-	// Update HEAD so that gitweb shows the most recent commit.
+
+	// Update HEAD directly for bare repositories so that gitweb shows the most recent remote commit.
 	if err := runGitCommand(ctx, target.folder, []string{
 		"update-ref",
-		"refs/heads/HEAD",
-		fmt.Sprintf("refs/remotes/origin/%v", target.source.DefaultBranch),
+		target.trackingRef(),
+		target.defaultRemoteRef(),
 	}); err != nil {
 		return err
+	}
+
+	if !isBare(f.options) {
+		localRef, err := runCommand(ctx, target.folder, "git", []string{"symbolic-ref", "--short", "HEAD"})
+		if err != nil {
+			return err
+		}
+		if localRef == target.source.DefaultBranch {
+			// TODO: Also check if working directory is clean.
+			if err := runGitCommand(ctx, target.folder, []string{
+				"merge",
+				"--ff-only",
+				fmt.Sprintf("origin/%v", target.source.DefaultBranch),
+			}); err != nil {
+				return err
+			}
+		}
 	}
 	slog.Debug("Updated target repository contents.", dataAttrs(slog.String("path", target.folder)))
 	return nil
@@ -148,11 +196,12 @@ func (f *sourcesSyncer) updateTargetMetadata(ctx context.Context, target *target
 }
 
 var (
-	repoModTime = func(fp string) time.Time {
-		return fileModTime(filepath.Join(fp, "refs/heads"))
+	targetModTime = func(target *target) time.Time {
+		return fileModTime(target.gitPath(target.trackingRef()))
 	}
 	runGitCommand = func(ctx context.Context, cwd string, args []string) error {
-		return runCommand(ctx, cwd, "git", args)
+		_, err := runCommand(ctx, cwd, "git", args)
+		return err
 	}
 )
 
@@ -164,19 +213,24 @@ func fileModTime(fp string) time.Time {
 	return info.ModTime()
 }
 
-func runCommand(ctx context.Context, cwd, name string, args []string) error {
+func runCommand(ctx context.Context, cwd, name string, args []string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = cwd
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return err
+		return "", err
 	}
 	if err := cmd.Start(); err != nil {
-		return err
+		return "", err
 	}
-	txt, _ := io.ReadAll(stderr)
+	errData, _ := io.ReadAll(stderr)
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("%w: %v", err, string(txt))
+		return "", fmt.Errorf("%w: %v", err, string(errData))
 	}
-	return nil
+	outData, _ := io.ReadAll(stdout)
+	return string(outData), nil
 }

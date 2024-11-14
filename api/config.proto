@@ -6,11 +6,23 @@ option go_package = "github.com/mtth/gitfetcher/configpb_gen;configpb";
 
 // Overall fetching configuration.
 message Config {
+  // All repository sources to fetch.
+  repeated Source sources = 1;
+
+  // Global options.
+  Options options = 2;
+}
+
+message Options {
   // Path to root folder, defaults to the configuration's enclosing directory.
   string root = 1;
 
-  // All repository sources to fetch.
-  repeated Source sources = 2;
+  // Repository layout.
+  enum Layout {
+    DEFAULT_LAYOUT = 0;
+    BARE_LAYOUT = 1;
+  }
+  Layout layout = 2;
 }
 
 message Source {
@@ -21,7 +33,11 @@ message Source {
 }
 
 message UrlSource {
+  // The URL to clone the repository from.
   string url = 1;
+
+  // The name of the branch tracked by HEAD. The default is inferred when
+  // possible (e.g. for GitHub URLs), falling back to main otherwise.
   string default_branch = 2;
 }
 
