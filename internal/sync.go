@@ -162,18 +162,25 @@ func (f *sourcesSyncer) updateTargetContents(ctx context.Context, target *target
 	}
 
 	if !isBare(f.options) {
-		localRef, err := runCommand(ctx, target.folder, "git", []string{"symbolic-ref", "--short", "HEAD"})
-		if err != nil {
-			return err
-		}
-		if localRef == target.source.DefaultBranch {
-			// TODO: Also check if working directory is clean.
-			if err := runGitCommand(ctx, target.folder, []string{
-				"merge",
-				"--ff-only",
-				fmt.Sprintf("origin/%v", target.source.DefaultBranch),
-			}); err != nil {
+		if !fileExists(target.gitPath("refs/heads/HEAD")) {
+			// No working directory yet.
+			if err := runGitCommand(ctx, target.folder, []string{"checkout", target.source.DefaultBranch}); err != nil {
 				return err
+			}
+		} else {
+			localRef, err := runCommand(ctx, target.folder, "git", []string{"symbolic-ref", "--short", "HEAD"})
+			if err != nil {
+				return err
+			}
+			if localRef == target.source.DefaultBranch {
+				// TODO: Also check if working directory is clean.
+				if err := runGitCommand(ctx, target.folder, []string{
+					"merge",
+					"--ff-only",
+					fmt.Sprintf("origin/%v", target.source.DefaultBranch),
+				}); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -188,7 +195,7 @@ func (f *sourcesSyncer) updateTargetMetadata(ctx context.Context, target *target
 		runGitCommand(ctx, target.folder, []string{"config", "set", "gitweb.extraBranchRefs", "remotes"}),
 	}
 	if desc := target.source.Description; desc != "" {
-		errs = append(errs, os.WriteFile(filepath.Join(target.folder, "description"), []byte(desc), 0644))
+		errs = append(errs, os.WriteFile(target.gitPath("description"), []byte(desc), 0644))
 	}
 	err := errors.Join(errs...)
 	slog.Debug("Updated target repository medatada.", dataAttrs(slog.String("path", target.folder)))
@@ -211,6 +218,11 @@ func fileModTime(fp string) time.Time {
 		return time.Time{}
 	}
 	return info.ModTime()
+}
+
+func fileExists(fp string) bool {
+	_, err := os.Stat(fp)
+	return !os.IsNotExist(err)
 }
 
 func runCommand(ctx context.Context, cwd, name string, args []string) (string, error) {
