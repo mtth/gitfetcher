@@ -95,7 +95,7 @@ type sourceFinder struct {
 	githubClient *github.Client
 }
 
-var standardURLPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)(\.git|/)?$`)
+var standardURLPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/?$`)
 
 func (c *sourceFinder) findURLSource(
 	ctx context.Context,
@@ -109,15 +109,16 @@ func (c *sourceFinder) findURLSource(
 	opts := sourceOptions{
 		defaultBranch: cfg.GetDefaultBranch(),
 	}
+	suffix := strings.TrimSuffix(matches[3], ".git")
 	switch matches[1] {
 	case "github.com":
-		repo, _, err := c.githubClient.Repositories.Get(ctx, matches[2], matches[3])
+		repo, _, err := c.githubClient.Repositories.Get(ctx, matches[2], suffix)
 		if err != nil {
 			return fmt.Errorf("unable to get source from URL %s: %w", url, err)
 		}
 		c.builder.addGithubRepo(repo, opts)
 	default:
-		c.builder.addStandardURLRepo(url, fmt.Sprintf("%s/%s", matches[2], matches[3]), opts)
+		c.builder.addStandardURLRepo(url, fmt.Sprintf("%s/%s", matches[2], suffix), opts)
 	}
 	slog.Debug("Added URL source.", dataAttrs(slog.String("url", url)))
 	return nil
