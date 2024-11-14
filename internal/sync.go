@@ -31,7 +31,7 @@ func GetSyncStatus(root string, src *Source) SyncStatus {
 	if lastSyncedAt.IsZero() {
 		return SyncStatusAbsent
 	}
-	if lastSyncedAt.Before(src.LastUpdatedAt) {
+	if src.LastUpdatedAt.IsZero() || lastSyncedAt.Before(src.LastUpdatedAt) {
 		return SyncStatusStale
 	}
 	return SyncStatusFresh

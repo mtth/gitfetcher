@@ -10,6 +10,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestFindSources_StandardURL(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("single named repo", func(t *testing.T) {
+		srcs, err := FindSources(ctx, &configpb.Config{
+			Sources: []*configpb.Source{{
+				Branch: &configpb.Source_FromUrl{
+					FromUrl: &configpb.UrlSource{
+						Url:           "https://gitlab.archlinux.org/archlinux/devtools.git",
+						DefaultBranch: "master",
+					},
+				},
+			}},
+		})
+		require.NoError(t, err)
+		assert.Len(t, srcs, 1)
+		assert.Equal(t, "archlinux/devtools", srcs[0].Name)
+		assert.Equal(t, "master", srcs[0].DefaultBranch)
+	})
+
+	t.Run("invalid URL", func(t *testing.T) {
+		srcs, err := FindSources(ctx, &configpb.Config{
+			Sources: []*configpb.Source{{
+				Branch: &configpb.Source_FromUrl{
+					FromUrl: &configpb.UrlSource{
+						Url: "https://example.com/unsupported/nested/repo.git",
+					},
+				},
+			}},
+		})
+		assert.Nil(t, srcs)
+		assert.ErrorIs(t, err, errUnsupportedURL)
+	})
+}
+
 func TestFindSources_Github(t *testing.T) {
 	ctx := context.Background()
 
@@ -26,6 +61,7 @@ func TestFindSources_Github(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, srcs, 1)
 		assert.Equal(t, "mtth/gitfetcher", srcs[0].Name)
+		assert.Equal(t, "main", srcs[0].DefaultBranch)
 	})
 
 	t.Run("invalid token", func(t *testing.T) {

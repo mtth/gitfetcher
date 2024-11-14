@@ -1,6 +1,7 @@
 package gitfetcher
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -51,13 +52,29 @@ func FindSources(ctx context.Context, cfg *configpb.Config) ([]*Source, error) {
 
 type sourcesBuilder []*Source
 
-func (b *sourcesBuilder) addGithubRepo(repo *github.Repository, flags []string) {
+type sourceOptions struct {
+	defaultBranch string
+	fetchFlags    []string
+}
+
+const defaultBranch = "main"
+
+func (b *sourcesBuilder) addStandardURLRepo(url string, name string, opts sourceOptions) {
+	*b = append(*b, &Source{
+		Name:          name,
+		FetchURL:      url,
+		DefaultBranch: cmp.Or(opts.defaultBranch, defaultBranch),
+		fetchFlags:    opts.fetchFlags,
+	})
+}
+
+func (b *sourcesBuilder) addGithubRepo(repo *github.Repository, opts sourceOptions) {
 	*b = append(*b, &Source{
 		Name:          repo.GetFullName(),
 		FetchURL:      repo.GetCloneURL(),
 		Description:   repo.GetDescription(),
-		fetchFlags:    flags,
-		DefaultBranch: repo.GetDefaultBranch(),
+		fetchFlags:    opts.fetchFlags,
+		DefaultBranch: cmp.Or(opts.defaultBranch, repo.GetDefaultBranch(), defaultBranch),
 		LastUpdatedAt: repo.GetUpdatedAt().Time,
 	})
 }
@@ -78,22 +95,31 @@ type sourceFinder struct {
 	githubClient *github.Client
 }
 
-var githubURLPattern = regexp.MustCompile(`^https://github.com/([^/]+)/([^/]+)/?$`)
+var standardURLPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/?$`)
 
 func (c *sourceFinder) findURLSource(
 	ctx context.Context,
 	cfg *configpb.UrlSource,
 ) error {
 	url := cfg.GetUrl()
-	matches := githubURLPattern.FindStringSubmatch(url)
+	matches := standardURLPattern.FindStringSubmatch(url)
 	if matches == nil {
 		return fmt.Errorf("%w: %s", errUnsupportedURL, url)
 	}
-	repo, _, err := c.githubClient.Repositories.Get(ctx, matches[1], matches[2])
-	if err != nil {
-		return fmt.Errorf("unable to get source from URL %s: %w", url, err)
+	opts := sourceOptions{
+		defaultBranch: cfg.GetDefaultBranch(),
 	}
-	c.builder.addGithubRepo(repo, nil)
+	suffix := strings.TrimSuffix(matches[3], ".git")
+	switch matches[1] {
+	case "github.com":
+		repo, _, err := c.githubClient.Repositories.Get(ctx, matches[2], suffix)
+		if err != nil {
+			return fmt.Errorf("unable to get source from URL %s: %w", url, err)
+		}
+		c.builder.addGithubRepo(repo, opts)
+	default:
+		c.builder.addStandardURLRepo(url, fmt.Sprintf("%s/%s", matches[2], suffix), opts)
+	}
 	slog.Debug("Added URL source.", dataAttrs(slog.String("url", url)))
 	return nil
 }
@@ -132,7 +158,7 @@ func (c *sourceFinder) findGithubTokenSources(
 				skipped++
 				continue
 			}
-			c.builder.addGithubRepo(repo, flags)
+			c.builder.addGithubRepo(repo, sourceOptions{fetchFlags: flags})
 			added++
 		}
 		if res.NextPage == 0 {

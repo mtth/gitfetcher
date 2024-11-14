@@ -22,6 +22,7 @@ message Source {
 
 message UrlSource {
   string url = 1;
+  string default_branch = 2;
 }
 
 message GithubTokenSource {
