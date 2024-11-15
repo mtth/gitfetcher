@@ -22,7 +22,7 @@ func TestSync(t *testing.T) {
 			err := Sync(ctx, nil, &configpb.Options{Root: "/tmp"})
 			require.NoError(t, err)
 		},
-		"single missing source": func(t *testing.T, _ map[string]time.Time, out fmt.Stringer) {
+		"single bare missing source": func(t *testing.T, _ map[string]time.Time, out fmt.Stringer) {
 			err := Sync(ctx, []*Source{{
 				Name:          "cool/test",
 				FetchURL:      "http://example.com/test",
@@ -35,6 +35,24 @@ func TestSync(t *testing.T) {
 				"remote add -m main origin http://example.com/test",
 				"fetch --all",
 				"update-ref refs/heads/HEAD refs/remotes/origin/main",
+				"config set gitweb.url http://example.com/test",
+				"config set gitweb.extraBranchRefs remotes",
+			}, strings.Split(strings.TrimSpace(out.String()), "\n"))
+		},
+		"single missing source": func(t *testing.T, _ map[string]time.Time, out fmt.Stringer) {
+			err := Sync(ctx, []*Source{{
+				Name:          "cool/test",
+				FetchURL:      "http://example.com/test",
+				DefaultBranch: "main",
+				LastUpdatedAt: t0,
+			}}, &configpb.Options{Root: "/tmp"})
+			require.NoError(t, err)
+			assert.Equal(t, []string{
+				"init -b main",
+				"remote add -m main origin http://example.com/test",
+				"fetch --all",
+				"update-ref refs/remotes/origin/HEAD refs/remotes/origin/main",
+				"checkout main",
 				"config set gitweb.url http://example.com/test",
 				"config set gitweb.extraBranchRefs remotes",
 			}, strings.Split(strings.TrimSpace(out.String()), "\n"))
