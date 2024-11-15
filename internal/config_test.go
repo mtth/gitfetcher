@@ -19,7 +19,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			path: "testdata",
 			want: &configpb.Config{
-				Root: "testdata/projects",
+				Options: &configpb.Options{Root: "testdata/projects"},
 				Sources: []*configpb.Source{{
 					Branch: &configpb.Source_FromUrl{
 						FromUrl: &configpb.UrlSource{
@@ -46,7 +46,7 @@ func TestParseConfig(t *testing.T) {
 						},
 					},
 				}},
-				Root: "testdata",
+				Options: &configpb.Options{Root: "testdata"},
 			},
 		},
 	} {
