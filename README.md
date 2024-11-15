@@ -23,8 +23,17 @@ Sample `.gitfetcher.conf` configuration ([`txtpb` format][txtpb]):
 
 ```pbtxt
   # Sync public repositories from their URL.
-sources { from_url { url: "https://github.com/golang/go" }}
-sources { from_url { url: "https://github.com/nodejs/node" }}
+sources {
+  from_url { url: "https://github.com/golang/go" }
+}
+sources {
+  from_url {
+    url: "https://github.com/nodejs/node"
+
+    # Optional override for the local path to the repository.
+    path: "node"
+  }
+}
 
 # Sync repositories available to a given GitHub authentication token. This is
 # useful for example to sync all your personal repos.
@@ -47,11 +56,15 @@ sources {
 
 # More sources...
 
-# Optional settings
+# Optional settings.
 options {
-  # Path to root folder where local repositories will be stored, relative to the
+  # Root folder where local repositories will be stored, relative to the
   # configuration file. Defaults to the configuration's enclosing directory.
-  # root: "/path/to/.gitfetcher"
+  # root: "/path/to/.gitfetcher.conf"
+
+  # Layout used for repositories. The default is a standard repository with a
+  # work directory. It's possible to use bare repos instead with BARE_LAYOUT.
+  # layout: BARE_LAYOUT
 }
 ```
 

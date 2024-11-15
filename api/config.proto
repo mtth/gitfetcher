@@ -19,7 +19,9 @@ message Options {
 
   // Repository layout.
   enum Layout {
+    // Default repository, including a worktree.
     DEFAULT_LAYOUT = 0;
+    // Bare repository, without a worktree.
     BARE_LAYOUT = 1;
   }
   Layout layout = 2;
@@ -37,8 +39,11 @@ message UrlSource {
   string url = 1;
 
   // The name of the branch tracked by HEAD. The default is inferred when
-  // possible (e.g. for GitHub URLs), falling back to main otherwise.
+  // possible (e.g. for GitHub repositories), falling back to main otherwise.
   string default_branch = 2;
+
+  // Local repository path override, relative to the root.
+  string path = 3;
 }
 
 message GithubTokenSource {

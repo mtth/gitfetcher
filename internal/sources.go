@@ -18,9 +18,9 @@ import (
 
 // Source captures information about a repository to be mirrored.
 type Source struct {
-	Name, FetchURL, Description, DefaultBranch string
-	LastUpdatedAt                              time.Time
-	fetchFlags                                 []string
+	Name, FetchURL, Description, DefaultBranch, Path string
+	LastUpdatedAt                                    time.Time
+	fetchFlags                                       []string
 }
 
 // FindSources returns all sources for the provided configuration.
@@ -53,8 +53,8 @@ func FindSources(ctx context.Context, cfg *configpb.Config) ([]*Source, error) {
 type sourcesBuilder []*Source
 
 type sourceOptions struct {
-	defaultBranch string
-	fetchFlags    []string
+	defaultBranch, path string
+	fetchFlags          []string
 }
 
 const defaultBranch = "main"
@@ -64,6 +64,7 @@ func (b *sourcesBuilder) addStandardURLRepo(url string, name string, opts source
 		Name:          name,
 		FetchURL:      url,
 		DefaultBranch: cmp.Or(opts.defaultBranch, defaultBranch),
+		Path:          opts.path,
 		fetchFlags:    opts.fetchFlags,
 	})
 }
@@ -73,9 +74,10 @@ func (b *sourcesBuilder) addGithubRepo(repo *github.Repository, opts sourceOptio
 		Name:          repo.GetFullName(),
 		FetchURL:      repo.GetCloneURL(),
 		Description:   repo.GetDescription(),
-		fetchFlags:    opts.fetchFlags,
 		DefaultBranch: cmp.Or(opts.defaultBranch, repo.GetDefaultBranch(), defaultBranch),
 		LastUpdatedAt: repo.GetUpdatedAt().Time,
+		Path:          opts.path,
+		fetchFlags:    opts.fetchFlags,
 	})
 }
 
@@ -108,6 +110,7 @@ func (c *sourceFinder) findURLSource(
 	}
 	opts := sourceOptions{
 		defaultBranch: cfg.GetDefaultBranch(),
+		path:          cfg.GetPath(),
 	}
 	suffix := strings.TrimSuffix(matches[3], ".git")
 	switch matches[1] {
