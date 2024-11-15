@@ -46,6 +46,9 @@ func isBare(opts *configpb.Options) bool {
 }
 
 func repoRoot(src *Source, opts *configpb.Options) string {
+	if src.Path != "" {
+		return filepath.Join(opts.GetRoot(), src.Path)
+	}
 	base := filepath.Join(opts.GetRoot(), src.Name)
 	if isBare(opts) {
 		base += ".git"

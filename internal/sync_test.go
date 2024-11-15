@@ -28,6 +28,7 @@ func TestSync(t *testing.T) {
 				FetchURL:      "http://example.com/test",
 				DefaultBranch: "main",
 				LastUpdatedAt: t0,
+				Path:          "foo",
 			}}, &configpb.Options{Root: "/tmp", Layout: configpb.Options_BARE_LAYOUT})
 			require.NoError(t, err)
 			assert.Equal(t, []string{
