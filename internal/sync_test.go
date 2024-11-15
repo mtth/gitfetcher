@@ -66,10 +66,9 @@ func TestSync(t *testing.T) {
 	} {
 		t.Run(key, func(t *testing.T) {
 			var b strings.Builder
-			defer swap(&runGitCommand, func(ctx context.Context, cwd string, args []string) error {
+			defer swap(&runGitCommand, func(ctx context.Context, cwd string, args []string) {
 				b.WriteString(strings.Join(args, " "))
 				b.WriteString("\n")
-				return nil
 			})()
 
 			ts := make(map[string]time.Time)
@@ -117,23 +116,19 @@ func TestRunCommand(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("executable not found", func(t *testing.T) {
-		_, err := runCommand(ctx, ".", "non-existent", nil)
-		require.ErrorContains(t, err, "not found")
+		require.Panics(t, func() { runCommand(ctx, ".", "non-existent", nil) })
 	})
 
 	t.Run("OK invocation", func(t *testing.T) {
-		_, err := runCommand(ctx, ".", "echo", []string{"bar"})
-		require.NoError(t, err)
+		require.NotPanics(t, func() { runCommand(ctx, ".", "echo", []string{"bar"}) })
 	})
 
 	t.Run("failed invocation", func(t *testing.T) {
-		_, err := runCommand(ctx, ".", "false", nil)
-		require.ErrorContains(t, err, "exit")
+		require.Panics(t, func() { runCommand(ctx, ".", "false", nil) })
 	})
 }
 
 func TestRunGitCommand(t *testing.T) {
 	ctx := context.Background()
-	got := runGitCommand(ctx, ".", []string{"status"})
-	require.NoError(t, got)
+	require.NotPanics(t, func() { runGitCommand(ctx, ".", []string{"status"}) })
 }
