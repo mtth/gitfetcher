@@ -24,9 +24,6 @@ Sample `.gitfetcher.conf` configuration ([`txtpb` format][txtpb]):
 ```pbtxt
   # Sync public repositories from their URL.
 sources {
-  from_url { url: "https://github.com/golang/go" }
-}
-sources {
   from_url {
     url: "https://github.com/nodejs/node"
 
