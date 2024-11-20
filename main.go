@@ -44,7 +44,7 @@ func main() {
 			}
 			for _, src := range srcs {
 				status := gitfetcher.GetSyncStatus(src, cfg.GetOptions())
-				fmt.Printf("%v\t%s\t%s\n", status, src.Name, src.FetchURL) //nolint:forbidigo
+				fmt.Printf("%v\t%s\t%s\n", status, src.FullName, src.FetchURL) //nolint:forbidigo
 			}
 			return nil
 		},

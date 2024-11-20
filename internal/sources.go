@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"os"
 	"regexp"
@@ -18,9 +19,9 @@ import (
 
 // Source captures information about a repository to be mirrored.
 type Source struct {
-	Name, FetchURL, Description, DefaultBranch, Path string
-	LastUpdatedAt                                    time.Time
-	fetchFlags                                       []string
+	FullName, FetchURL, Description, DefaultBranch, Path string
+	LastUpdatedAt                                        time.Time
+	fetchFlags                                           []string
 }
 
 // FindSources returns all sources for the provided configuration.
@@ -62,7 +63,7 @@ const defaultBranch = "main"
 
 func (b *sourcesBuilder) addStandardURLRepo(url string, name string, opts sourceOptions) {
 	*b = append(*b, &Source{
-		Name:          name,
+		FullName:      name,
 		FetchURL:      url,
 		DefaultBranch: cmp.Or(opts.defaultBranch, defaultBranch),
 		Path:          opts.path,
@@ -72,7 +73,7 @@ func (b *sourcesBuilder) addStandardURLRepo(url string, name string, opts source
 
 func (b *sourcesBuilder) addGithubRepo(repo *github.Repository, opts sourceOptions) {
 	src := &Source{
-		Name:          repo.GetFullName(),
+		FullName:      repo.GetFullName(),
 		Description:   repo.GetDescription(),
 		DefaultBranch: cmp.Or(opts.defaultBranch, repo.GetDefaultBranch(), defaultBranch),
 		LastUpdatedAt: repo.GetUpdatedAt().Time,
@@ -93,9 +94,10 @@ func (b *sourcesBuilder) build() []*Source {
 }
 
 var (
-	errInvalidGithubToken = errors.New("invalid GitHub token")
-	errUnexpectedConfig   = errors.New("unexpected config")
-	errUnsupportedURL     = errors.New("unsupported URL")
+	errInvalidGithubToken  = errors.New("invalid GitHub token")
+	errInvalidPathTemplate = errors.New("invalid path template")
+	errUnexpectedConfig    = errors.New("unexpected config")
+	errUnsupportedURL      = errors.New("unsupported URL")
 )
 
 // sourceFinder is a GitHub-backed sourcesFinder implementation.
@@ -168,9 +170,16 @@ func (c *sourceFinder) findGithubTokenSources(
 				skipped++
 				continue
 			}
+
+			path, err := githubSourcePath(cfg.GetPathTemplate(), repo)
+			if err != nil {
+				return fmt.Errorf("%w: %v", errInvalidPathTemplate, err)
+			}
+
 			c.builder.addGithubRepo(repo, sourceOptions{
 				fetchFlags:     flags,
 				remoteProtocol: cfg.GetRemoteProtocol(),
+				path:           path,
 			})
 			added++
 		}
@@ -184,6 +193,23 @@ func (c *sourceFinder) findGithubTokenSources(
 		dataAttrs(slog.Int("added", added), slog.Int("skipped", skipped)),
 	)
 	return nil
+}
+
+func githubSourcePath(tpl string, repo *github.Repository) (string, error) {
+	if tpl == "" {
+		return "", nil
+	}
+	parsed, err := template.New("path").Parse(tpl)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	err = parsed.Execute(&b, map[string]string{
+		"FullName": repo.GetFullName(),
+		"Name":     repo.GetName(),
+		"Owner":    repo.GetOwner().GetName(),
+	})
+	return b.String(), err
 }
 
 type namePredicate []glob.Glob

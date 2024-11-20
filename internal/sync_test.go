@@ -24,7 +24,7 @@ func TestSync(t *testing.T) {
 		},
 		"single bare missing source": func(t *testing.T, _ map[string]time.Time, out fmt.Stringer) {
 			err := Sync(ctx, []*Source{{
-				Name:          "cool/test",
+				FullName:      "cool/test",
 				FetchURL:      "http://example.com/test",
 				DefaultBranch: "main",
 				LastUpdatedAt: t0,
@@ -42,7 +42,7 @@ func TestSync(t *testing.T) {
 		},
 		"single missing source": func(t *testing.T, _ map[string]time.Time, out fmt.Stringer) {
 			err := Sync(ctx, []*Source{{
-				Name:          "cool/test",
+				FullName:      "cool/test",
 				FetchURL:      "http://example.com/test",
 				DefaultBranch: "main",
 				LastUpdatedAt: t0,
@@ -62,12 +62,12 @@ func TestSync(t *testing.T) {
 			times["/tmp/cool/stale.git"] = t0
 			times["/tmp/cool/up-to-date.git"] = t0
 			err := Sync(ctx, []*Source{{
-				Name:          "cool/stale",
+				FullName:      "cool/stale",
 				FetchURL:      "http://example.com/stale",
 				DefaultBranch: "main",
 				LastUpdatedAt: t1,
 			}, {
-				Name:          "cool/up-to-date",
+				FullName:      "cool/up-to-date",
 				FetchURL:      "http://example.com/up-to-date",
 				DefaultBranch: "main",
 				LastUpdatedAt: t0,
@@ -105,7 +105,7 @@ func TestGetSyncStatus(t *testing.T) {
 
 	t.Run("missing source", func(t *testing.T) {
 		got := GetSyncStatus(&Source{
-			Name:          "cool/test",
+			FullName:      "cool/test",
 			FetchURL:      "http://example.com/test",
 			DefaultBranch: "main",
 			LastUpdatedAt: t0,

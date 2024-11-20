@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/go-github/v66/github"
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,7 @@ func TestFindSources_StandardURL(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Len(t, srcs, 1)
-		assert.Equal(t, "archlinux/devtools", srcs[0].Name)
+		assert.Equal(t, "archlinux/devtools", srcs[0].FullName)
 		assert.Equal(t, "master", srcs[0].DefaultBranch)
 	})
 
@@ -60,7 +61,7 @@ func TestFindSources_Github(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Len(t, srcs, 1)
-		assert.Equal(t, "mtth/gitfetcher", srcs[0].Name)
+		assert.Equal(t, "mtth/gitfetcher", srcs[0].FullName)
 		assert.Equal(t, "main", srcs[0].DefaultBranch)
 	})
 
@@ -119,3 +120,34 @@ func TestNamePredicate(t *testing.T) {
 		assert.False(t, got.accept("bar/baz"))
 	})
 }
+
+func TestGithubSourcePath(t *testing.T) {
+	for key, tc := range map[string]struct {
+		tpl          string
+		repo         *github.Repository
+		path, errMsg string
+	}{
+		"empty template":  {},
+		"static template": {tpl: "foo", path: "foo"},
+		"dynamic template": {
+			tpl: "{{ .Owner }}/{{ .Name }}",
+			repo: &github.Repository{
+				Owner: &github.User{Name: addr("ann")},
+				Name:  addr("bar"),
+			},
+			path: "ann/bar",
+		},
+	} {
+		t.Run(key, func(t *testing.T) {
+			path, err := githubSourcePath(tc.tpl, tc.repo)
+			if tc.errMsg == "" {
+				require.NoError(t, err)
+				assert.Equal(t, path, tc.path)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
+}
+
+func addr[T any](t T) *T { return &t }

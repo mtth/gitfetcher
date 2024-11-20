@@ -49,7 +49,7 @@ func repoRoot(src *Source, opts *configpb.Options) string {
 	if src.Path != "" {
 		return filepath.Join(opts.GetRoot(), src.Path)
 	}
-	base := filepath.Join(opts.GetRoot(), src.Name)
+	base := filepath.Join(opts.GetRoot(), src.FullName)
 	if isBare(opts) {
 		base += ".git"
 	}
@@ -118,7 +118,7 @@ func (f *sourcesSyncer) syncSource(ctx context.Context, src *Source) (err error)
 		}
 	}()
 
-	attrs := dataAttrs(slog.String("name", src.Name))
+	attrs := dataAttrs(slog.String("fullName", src.FullName))
 	slog.Debug("Syncing source...", attrs)
 
 	target := newTarget(src, f.options)
