@@ -41,8 +41,9 @@ func TestParseConfig(t *testing.T) {
 				Sources: []*configpb.Source{{
 					Branch: &configpb.Source_FromGithubToken{
 						FromGithubToken: &configpb.GithubTokenSource{
-							Token:   "secret-token",
-							Filters: []string{"foo/*"},
+							Token:          "secret-token",
+							Filters:        []string{"foo/*"},
+							RemoteProtocol: configpb.GithubTokenSource_SSH_REMOTE_PROTOCOL,
 						},
 					},
 				}},

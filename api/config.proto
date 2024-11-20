@@ -58,4 +58,13 @@ message GithubTokenSource {
   // unset, all names are eligible. Globs follow standard wildcards:
   // https://tldp.org/LDP/GNU-Linux-Tools-Summary/html/x11655.htm
   repeated string filters = 3;
+
+  // Protocol used to update repositories.
+  enum RemoteProtocol {
+    // HTTPS.
+    DEFAULT_REMOTE_PROTOCOL = 0;
+    // SSH.
+    SSH_REMOTE_PROTOCOL = 1;
+  }
+  RemoteProtocol remote_protocol = 4;
 }
