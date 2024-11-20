@@ -51,13 +51,16 @@ message GithubTokenSource {
   // fetching private repositories.
   string token = 1;
 
-  // Whether to fetch forks (by default they are skipped).
+  // Whether to fetch forks.
   bool include_forks = 2;
+
+  // Whether to fetch archived repositories.
+  bool include_archived = 3;
 
   // List of glob patterns used to filter fetched repositories by name. If
   // unset, all names are eligible. Globs follow standard wildcards:
   // https://tldp.org/LDP/GNU-Linux-Tools-Summary/html/x11655.htm
-  repeated string filters = 3;
+  repeated string filters = 4;
 
   // Protocol used to update repositories.
   enum RemoteProtocol {
@@ -66,5 +69,5 @@ message GithubTokenSource {
     // SSH.
     SSH_REMOTE_PROTOCOL = 1;
   }
-  RemoteProtocol remote_protocol = 4;
+  RemoteProtocol remote_protocol = 5;
 }
