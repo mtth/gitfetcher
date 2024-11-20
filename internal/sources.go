@@ -55,6 +55,7 @@ type sourcesBuilder []*Source
 type sourceOptions struct {
 	defaultBranch, path string
 	fetchFlags          []string
+	remoteProtocol      configpb.GithubTokenSource_RemoteProtocol
 }
 
 const defaultBranch = "main"
@@ -70,15 +71,21 @@ func (b *sourcesBuilder) addStandardURLRepo(url string, name string, opts source
 }
 
 func (b *sourcesBuilder) addGithubRepo(repo *github.Repository, opts sourceOptions) {
-	*b = append(*b, &Source{
+	src := &Source{
 		Name:          repo.GetFullName(),
-		FetchURL:      repo.GetCloneURL(),
 		Description:   repo.GetDescription(),
 		DefaultBranch: cmp.Or(opts.defaultBranch, repo.GetDefaultBranch(), defaultBranch),
 		LastUpdatedAt: repo.GetUpdatedAt().Time,
 		Path:          opts.path,
 		fetchFlags:    opts.fetchFlags,
-	})
+	}
+	switch opts.remoteProtocol {
+	case configpb.GithubTokenSource_DEFAULT_REMOTE_PROTOCOL:
+		src.FetchURL = repo.GetCloneURL()
+	case configpb.GithubTokenSource_SSH_REMOTE_PROTOCOL:
+		src.FetchURL = repo.GetSSHURL()
+	}
+	*b = append(*b, src)
 }
 
 func (b *sourcesBuilder) build() []*Source {
@@ -161,7 +168,10 @@ func (c *sourceFinder) findGithubTokenSources(
 				skipped++
 				continue
 			}
-			c.builder.addGithubRepo(repo, sourceOptions{fetchFlags: flags})
+			c.builder.addGithubRepo(repo, sourceOptions{
+				fetchFlags:     flags,
+				remoteProtocol: cfg.GetRemoteProtocol(),
+			})
 			added++
 		}
 		if res.NextPage == 0 {
