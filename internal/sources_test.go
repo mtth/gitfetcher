@@ -123,9 +123,10 @@ func TestNamePredicate(t *testing.T) {
 
 func TestGithubSourcePath(t *testing.T) {
 	for key, tc := range map[string]struct {
-		tpl          string
-		repo         *github.Repository
-		path, errMsg string
+		tpl   string
+		repo  *github.Repository
+		path  string
+		isErr bool
 	}{
 		"empty template":  {},
 		"static template": {tpl: "foo", path: "foo"},
@@ -137,14 +138,15 @@ func TestGithubSourcePath(t *testing.T) {
 			},
 			path: "ann/bar",
 		},
+		"invalid template": {tpl: "{{ .Unterminated", path: "foo", isErr: true},
 	} {
 		t.Run(key, func(t *testing.T) {
 			path, err := githubSourcePath(tc.tpl, tc.repo)
-			if tc.errMsg == "" {
+			if tc.isErr {
+				assert.Error(t, err)
+			} else {
 				require.NoError(t, err)
 				assert.Equal(t, path, tc.path)
-			} else {
-				assert.Error(t, err)
 			}
 		})
 	}

@@ -94,10 +94,10 @@ func (b *sourcesBuilder) build() []*Source {
 }
 
 var (
-	errInvalidGithubToken  = errors.New("invalid GitHub token")
-	errInvalidPathTemplate = errors.New("invalid path template")
-	errUnexpectedConfig    = errors.New("unexpected config")
-	errUnsupportedURL      = errors.New("unsupported URL")
+	errInvalidGithubToken = errors.New("invalid GitHub token")
+	errInvalidPath        = errors.New("invalid path")
+	errUnexpectedConfig   = errors.New("unexpected config")
+	errUnsupportedURL     = errors.New("unsupported URL")
 )
 
 // sourceFinder is a GitHub-backed sourcesFinder implementation.
@@ -173,7 +173,7 @@ func (c *sourceFinder) findGithubTokenSources(
 
 			path, err := githubSourcePath(cfg.GetPathTemplate(), repo)
 			if err != nil {
-				return fmt.Errorf("%w: %v", errInvalidPathTemplate, err)
+				return fmt.Errorf("%w: %v", errInvalidPath, err)
 			}
 
 			c.builder.addGithubRepo(repo, sourceOptions{
