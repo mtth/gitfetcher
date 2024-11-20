@@ -70,4 +70,9 @@ message GithubTokenSource {
     SSH_REMOTE_PROTOCOL = 1;
   }
   RemoteProtocol remote_protocol = 5;
+
+  // Local repository path override template, relative to the root. The
+  // following template variables are available: FullName, Name, Owner. The
+  // default is "{{ .FullName }}", suffixed with .git for bare repositories.
+  string path_template = 6;
 }
