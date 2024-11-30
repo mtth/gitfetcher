@@ -25,11 +25,60 @@ We also recommend various integrations below.
 
 === Gitweb
 
-The local copies of repositories fetched by *gitfetcher* are compatible with _gitweb_(1).
-A sample configuration file is available as `/usr/share/gitfetcher/gitweb.conf`.
+The local copies of repositories fetched by *gitfetcher* are compatible with _gitweb(1)_.
+Template configuration file, to store as `/etc/gitweb.conf`:
+
+[source]
+----
+our $projectroot = "/srv/git/mirrors";
+
+our $home_link_str = "mirrors";
+
+# our @git_base_url_list = qw();
+
+our $omit_owner = true;
+
+our $default_projects_order = "age";
+
+# Allows setting per-repo extraBranchRefs to show remote branches when
+# appropriate (e.g. for mirrors).
+$feature{'extra-branch-refs'}{'override'} = true;
+----
+
+You can find out more on available configuration values in this file by running `man gitweb.conf` or on https://git-scm.com/docs/gitweb.conf.
+
 
 === Systemd
 
 It can be useful to run *gitfetcher* on a schedule.
-This can be done for example via _crontab_(1) or via _systemd_(1).
-A sample service template unit for the latter is available as `/usr/share/gitfetcher/gitfetcher@.service`.
+This can be done for example via _crontab(1)_ or via _systemd(1)_.
+
+[source]
+----
+# /etc/systemd/system/gitfetcher.service
+[Unit]
+Description=Git repository mirroring
+After=network-online.target
+
+[Service]
+Type=exec
+ExecStart=gitfetcher sync /srv/git/mirrors/
+User=git
+----
+
+[source]
+----
+# /etc/systemd/system/gitfetcher.timer
+[Unit]
+Description=Run gitfetcher.service each day
+After=network-online.target
+
+[Timer]
+AccuracySec=15min
+OnCalendar=*-*-* 01:00:00
+RandomizedDelaySec=5min
+Unit=gitfetcher.service
+
+[Install]
+WantedBy=multi-user.target
+----
