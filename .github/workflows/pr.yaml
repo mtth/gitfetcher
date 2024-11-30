@@ -41,15 +41,3 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 3.3
-      - name: Set up AsciiDoctor
-        uses: reitzig/actions-asciidoctor@v2.0.2
-        with:
-          version: 2.0.18
-      - name: Generate man page
-        run: |
-          asciidoctor -b manpage -d manpage docs/gitfetcher.adoc -o - \
-            | gzip -9 >gitfetcher.1.gz
