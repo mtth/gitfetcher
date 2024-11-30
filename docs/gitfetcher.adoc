@@ -1,0 +1,35 @@
+= gitfetcher(1)
+Matthieu Monsch
+:doctype: manpage
+:manmanual: GITFETCHER
+:mansource: GITFETCHER
+
+
+== Name
+
+gitfetcher - sync remote repositories
+
+
+== Synopsis
+
+*gitfetcher* sync [_PATH_]
+
+*gitfetcher* status [_PATH_]
+
+
+== Description
+
+*gitfetcher* streamlines the work needed to keep local copies of remote repositories.
+
+We also recommend various integrations below.
+
+=== Gitweb
+
+The local copies of repositories fetched by *gitfetcher* are compatible with _gitweb_(1).
+A sample configuration file is available as `/usr/share/gitfetcher/gitweb.conf`.
+
+=== Systemd
+
+It can be useful to run *gitfetcher* on a schedule.
+This can be done for example via _crontab_(1) or via _systemd_(1).
+A sample service template unit for the latter is available as `/usr/share/gitfetcher/gitfetcher@.service`.

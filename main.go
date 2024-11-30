@@ -52,6 +52,7 @@ func main() {
 
 	rootCmd := &cobra.Command{Use: "gitfetcher", SilenceUsage: true}
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
+	rootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
 	rootCmd.AddCommand(syncCmd, statusCmd)
 
 	_ = rootCmd.ExecuteContext(ctx)
