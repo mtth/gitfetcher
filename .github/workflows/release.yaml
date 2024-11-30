@@ -80,4 +80,4 @@ jobs:
           release_tag: ${{ needs.create.outputs.release-tag }}
           md5sum: false
           sha256sum: true
-          extra_files: LICENSE gitfetcher.1.gz resources/gitweb.conf
+          extra_files: LICENSE gitfetcher.1.gz
