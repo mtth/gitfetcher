@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	gitfetcher.SetupLogging()
 	ctx := context.Background()
 
 	syncCmd := &cobra.Command{

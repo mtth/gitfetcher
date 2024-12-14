@@ -91,7 +91,7 @@ func TestSync(t *testing.T) {
 			})()
 
 			ts := make(map[string]time.Time)
-			defer swap(&targetModTime, func(t *target) time.Time {
+			defer swap(&syncableModTime, func(t *syncable) time.Time {
 				return ts[t.folder]
 			})()
 
@@ -127,7 +127,7 @@ func TestFileModTime(t *testing.T) {
 }
 
 func TestTargetModTime(t *testing.T) {
-	got := targetModTime(&target{folder: "./missing"})
+	got := syncableModTime(&syncable{folder: "./missing"})
 	assert.True(t, got.IsZero())
 }
 

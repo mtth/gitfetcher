@@ -17,8 +17,8 @@ import (
 
 // GetSyncStatus returns the current SyncStatus of a source.
 func GetSyncStatus(src *Source, opts *configpb.Options) SyncStatus {
-	target := newTarget(src, opts)
-	lastSyncedAt := targetModTime(target)
+	syncable := newSyncable(src, opts)
+	lastSyncedAt := syncableModTime(syncable)
 	if lastSyncedAt.IsZero() {
 		return SyncStatusAbsent
 	}
@@ -66,29 +66,29 @@ const (
 	SyncStatusFresh
 )
 
-type target struct {
+type syncable struct {
 	source *Source
 	folder string
 	bare   bool
 }
 
-func newTarget(src *Source, opts *configpb.Options) *target {
+func newSyncable(src *Source, opts *configpb.Options) *syncable {
 	folder := repoRoot(src, opts)
-	return &target{source: src, folder: folder, bare: isBare(opts)}
+	return &syncable{source: src, folder: folder, bare: isBare(opts)}
 }
 
-func (t *target) trackingRef() string {
+func (t *syncable) trackingRef() string {
 	if t.bare {
 		return "refs/heads/HEAD"
 	}
 	return "refs/remotes/origin/HEAD"
 }
 
-func (t *target) defaultRemoteRef() string {
+func (t *syncable) defaultRemoteRef() string {
 	return fmt.Sprintf("refs/remotes/origin/%v", t.source.DefaultBranch)
 }
 
-func (t *target) gitPath(obj string) string {
+func (t *syncable) gitPath(obj string) string {
 	if !t.bare {
 		obj = filepath.Join(".git", obj)
 	}
@@ -121,78 +121,78 @@ func (f *sourcesSyncer) syncSource(ctx context.Context, src *Source) (err error)
 	attrs := dataAttrs(slog.String("fullName", src.FullName))
 	slog.Debug("Syncing source...", attrs)
 
-	target := newTarget(src, f.options)
-	lastSyncedAt := targetModTime(target)
+	syncable := newSyncable(src, f.options)
+	lastSyncedAt := syncableModTime(syncable)
 	if lastSyncedAt.IsZero() {
-		f.createTarget(ctx, target)
+		f.createSyncable(ctx, syncable)
 	}
 	if src.LastUpdatedAt.IsZero() || lastSyncedAt.Before(src.LastUpdatedAt) {
-		f.updateTargetContents(ctx, target)
+		f.updateSyncableContents(ctx, syncable)
 	}
-	f.updateTargetMetadata(ctx, target)
+	f.updateSyncableMetadata(ctx, syncable)
 	slog.Info("Synced source.", attrs, errAttr(err))
 	return
 }
 
-func (f *sourcesSyncer) createTarget(ctx context.Context, target *target) {
-	checkSyncStep(os.MkdirAll(target.folder, 0755))
+func (f *sourcesSyncer) createSyncable(ctx context.Context, syncable *syncable) {
+	checkSyncStep(os.MkdirAll(syncable.folder, 0755))
 
 	// We don't use git clone to avoid having the credentials saved in the repo's config and share
 	// more logic with the update function below.
-	initArgs := []string{"init", "-b", target.source.DefaultBranch}
+	initArgs := []string{"init", "-b", syncable.source.DefaultBranch}
 	if isBare(f.options) {
 		initArgs = append(initArgs, "--bare")
 	}
-	runGitCommand(ctx, target.folder, initArgs)
-	runGitCommand(ctx, target.folder, []string{
+	runGitCommand(ctx, syncable.folder, initArgs)
+	runGitCommand(ctx, syncable.folder, []string{
 		"remote",
 		"add",
 		"-m",
-		target.source.DefaultBranch,
+		syncable.source.DefaultBranch,
 		"origin",
-		target.source.FetchURL,
+		syncable.source.FetchURL,
 	})
-	slog.Debug("Created target repository.", dataAttrs(slog.String("path", target.folder)))
+	slog.Debug("Created syncable repository.", dataAttrs(slog.String("path", syncable.folder)))
 }
 
-func (f *sourcesSyncer) updateTargetContents(ctx context.Context, target *target) {
-	runGitCommand(ctx, target.folder, append(target.source.fetchFlags, "fetch", "--all"))
+func (f *sourcesSyncer) updateSyncableContents(ctx context.Context, syncable *syncable) {
+	runGitCommand(ctx, syncable.folder, append(syncable.source.fetchFlags, "fetch", "--all"))
 
 	// Update HEAD directly for bare repositories so that gitweb shows the most recent remote commit.
-	runGitCommand(ctx, target.folder, []string{"update-ref", target.trackingRef(), target.defaultRemoteRef()})
+	runGitCommand(ctx, syncable.folder, []string{"update-ref", syncable.trackingRef(), syncable.defaultRemoteRef()})
 
 	if !isBare(f.options) {
-		if !fileExists(target.gitPath("refs/heads/HEAD")) {
+		if !fileExists(syncable.gitPath("refs/heads/HEAD")) {
 			// No working directory yet.
-			runGitCommand(ctx, target.folder, []string{"checkout", target.source.DefaultBranch})
+			runGitCommand(ctx, syncable.folder, []string{"checkout", syncable.source.DefaultBranch})
 		} else {
-			localRef := runCommand(ctx, target.folder, "git", []string{"symbolic-ref", "--short", "HEAD"})
-			if localRef == target.source.DefaultBranch {
+			localRef := runCommand(ctx, syncable.folder, "git", []string{"symbolic-ref", "--short", "HEAD"})
+			if localRef == syncable.source.DefaultBranch {
 				// TODO: Also check if working directory is clean.
-				runGitCommand(ctx, target.folder, []string{
+				runGitCommand(ctx, syncable.folder, []string{
 					"merge",
 					"--ff-only",
-					fmt.Sprintf("origin/%v", target.source.DefaultBranch),
+					fmt.Sprintf("origin/%v", syncable.source.DefaultBranch),
 				})
 			}
 		}
 	}
-	slog.Debug("Updated target repository contents.", dataAttrs(slog.String("path", target.folder)))
+	slog.Debug("Updated syncable repository contents.", dataAttrs(slog.String("path", syncable.folder)))
 }
 
-func (f *sourcesSyncer) updateTargetMetadata(ctx context.Context, target *target) {
-	runGitCommand(ctx, target.folder, []string{"config", "set", "gitweb.url", target.source.FetchURL})
+func (f *sourcesSyncer) updateSyncableMetadata(ctx context.Context, syncable *syncable) {
+	runGitCommand(ctx, syncable.folder, []string{"config", "set", "gitweb.url", syncable.source.FetchURL})
 	// This allows the remote branches to show up in the summary page's HEADS section.
-	runGitCommand(ctx, target.folder, []string{"config", "set", "gitweb.extraBranchRefs", "remotes"})
-	if desc := target.source.Description; desc != "" {
-		checkSyncStep(os.WriteFile(target.gitPath("description"), []byte(desc), 0644))
+	runGitCommand(ctx, syncable.folder, []string{"config", "set", "gitweb.extraBranchRefs", "remotes"})
+	if desc := syncable.source.Description; desc != "" {
+		checkSyncStep(os.WriteFile(syncable.gitPath("description"), []byte(desc), 0644))
 	}
-	slog.Debug("Updated target repository medatada.", dataAttrs(slog.String("path", target.folder)))
+	slog.Debug("Updated syncable repository medatada.", dataAttrs(slog.String("path", syncable.folder)))
 }
 
 var (
-	targetModTime = func(target *target) time.Time {
-		return fileModTime(target.gitPath(target.trackingRef()))
+	syncableModTime = func(syncable *syncable) time.Time {
+		return fileModTime(syncable.gitPath(syncable.trackingRef()))
 	}
 	runGitCommand = func(ctx context.Context, cwd string, args []string) {
 		runCommand(ctx, cwd, "git", args)

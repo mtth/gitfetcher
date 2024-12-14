@@ -9,8 +9,8 @@ import (
 	"github.com/adrg/xdg"
 )
 
-// init initializes the default logger.
-func init() {
+// SetupLogging initializes the default logger.
+func SetupLogging() {
 	var errs []error
 
 	fp, ok := os.LookupEnv("LOGS_DIRECTORY")
