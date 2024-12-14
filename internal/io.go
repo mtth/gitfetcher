@@ -1,30 +1,41 @@
 package gitfetcher
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"os"
 
 	"github.com/adrg/xdg"
-	"golang.org/x/term"
 )
 
+// init initializes the default logger.
 func init() {
-	// We write logs to stderr if it is not a terminal (e.g. if pointing to the journal), otherwise we
-	// write to a file.
-	var writer io.Writer
-	if term.IsTerminal(int(os.Stderr.Fd())) {
-		if fp, err := xdg.StateFile("gitfetcher/log"); err == nil {
-			if file, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				writer = file
-			}
+	var errs []error
+
+	fp, ok := os.LookupEnv("LOGS_DIRECTORY")
+	if !ok {
+		var err error
+		fp, err = xdg.StateFile("gitfetcher/log")
+		if err != nil {
+			errs = append(errs, err)
+			fp = "gitfetcher.log"
 		}
 	}
-	if writer == nil {
-		writer = os.Stderr
+
+	var writer io.Writer
+	if file, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		writer = file
+	} else {
+		errs = append(errs, err)
+		writer = os.Stdout
 	}
+
 	handler := slog.NewJSONHandler(writer, &slog.HandlerOptions{Level: slog.LevelDebug})
 	slog.SetDefault(slog.New(handler))
+	if len(errs) > 0 {
+		slog.Error("Log setup failed.", errAttr(errors.Join(errs...)))
+	}
 }
 
 const (
