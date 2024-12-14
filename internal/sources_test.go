@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFindSources_StandardURL(t *testing.T) {
+func TestGatherSources_StandardURL(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("single named repo", func(t *testing.T) {
-		srcs, err := FindSources(ctx, &configpb.Config{
+		srcs, err := GatherSources(ctx, &configpb.Config{
 			Sources: []*configpb.Source{{
 				Branch: &configpb.Source_FromUrl{
 					FromUrl: &configpb.UrlSource{
@@ -32,7 +32,7 @@ func TestFindSources_StandardURL(t *testing.T) {
 	})
 
 	t.Run("invalid URL", func(t *testing.T) {
-		srcs, err := FindSources(ctx, &configpb.Config{
+		srcs, err := GatherSources(ctx, &configpb.Config{
 			Sources: []*configpb.Source{{
 				Branch: &configpb.Source_FromUrl{
 					FromUrl: &configpb.UrlSource{
@@ -46,11 +46,11 @@ func TestFindSources_StandardURL(t *testing.T) {
 	})
 }
 
-func TestFindSources_Github(t *testing.T) {
+func TestGatherSources_Github(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("single named repo", func(t *testing.T) {
-		srcs, err := FindSources(ctx, &configpb.Config{
+		srcs, err := GatherSources(ctx, &configpb.Config{
 			Sources: []*configpb.Source{{
 				Branch: &configpb.Source_FromUrl{
 					FromUrl: &configpb.UrlSource{
@@ -66,7 +66,7 @@ func TestFindSources_Github(t *testing.T) {
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
-		srcs, err := FindSources(ctx, &configpb.Config{
+		srcs, err := GatherSources(ctx, &configpb.Config{
 			Sources: []*configpb.Source{{
 				Branch: &configpb.Source_FromGithubToken{
 					FromGithubToken: &configpb.GithubTokenSource{
@@ -84,7 +84,7 @@ func TestFindSources_Github(t *testing.T) {
 			t.SkipNow()
 		}
 
-		srcs, err := FindSources(ctx, &configpb.Config{
+		srcs, err := GatherSources(ctx, &configpb.Config{
 			Sources: []*configpb.Source{{
 				Branch: &configpb.Source_FromGithubToken{
 					FromGithubToken: &configpb.GithubTokenSource{

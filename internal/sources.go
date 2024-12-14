@@ -24,21 +24,21 @@ type Source struct {
 	fetchFlags                                           []string
 }
 
-// FindSources returns all sources for the provided configuration.
-func FindSources(ctx context.Context, cfg *configpb.Config) ([]*Source, error) {
-	slog.Debug("Finding sources...")
+// GatherSources returns all sources for the provided configuration.
+func GatherSources(ctx context.Context, cfg *configpb.Config) ([]*Source, error) {
+	slog.Debug("Gathering sources...")
 
 	var builder sourcesBuilder
-	finder := &sourceFinder{builder: &builder, githubClient: github.NewClient(nil)}
+	gatherer := &sourceGatherer{builder: &builder, githubClient: github.NewClient(nil)}
 
 	var errs []error
 	for _, src := range cfg.GetSources() {
 		var err error
 		switch b := src.GetBranch().(type) {
 		case *configpb.Source_FromUrl:
-			err = finder.findURLSource(ctx, b.FromUrl)
+			err = gatherer.gatherURLSource(ctx, b.FromUrl)
 		case *configpb.Source_FromGithubToken:
-			err = finder.findGithubTokenSources(ctx, b.FromGithubToken)
+			err = gatherer.gatherGithubTokenSources(ctx, b.FromGithubToken)
 		default:
 			return nil, fmt.Errorf("%w: %v", errUnexpectedConfig, cfg)
 		}
@@ -100,15 +100,15 @@ var (
 	errUnsupportedURL     = errors.New("unsupported URL")
 )
 
-// sourceFinder is a GitHub-backed sourcesFinder implementation.
-type sourceFinder struct {
+// sourceGatherer is a GitHub-backed sourcesGatherer implementation.
+type sourceGatherer struct {
 	builder      *sourcesBuilder
 	githubClient *github.Client
 }
 
 var standardURLPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/?$`)
 
-func (c *sourceFinder) findURLSource(
+func (c *sourceGatherer) gatherURLSource(
 	ctx context.Context,
 	cfg *configpb.UrlSource,
 ) error {
@@ -136,7 +136,7 @@ func (c *sourceFinder) findURLSource(
 	return nil
 }
 
-func (c *sourceFinder) findGithubTokenSources(
+func (c *sourceGatherer) gatherGithubTokenSources(
 	ctx context.Context,
 	cfg *configpb.GithubTokenSource,
 ) error {
