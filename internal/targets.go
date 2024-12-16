@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/mtth/gitfetcher/internal/except"
 )
 
 // remote is the name of the remote used for sources.
@@ -49,7 +51,7 @@ func remoteRefUpdateTimes(p string) map[string]time.Time {
 		}
 		if !entry.IsDir() {
 			if info, err := entry.Info(); err != nil {
-				slog.Warn("Ref info error, skipping.", errAttr(err))
+				slog.Warn("Ref info error, skipping.", except.LogErrAttr(err))
 			} else {
 				// The path module doesn't have an equivalent to filepath.Rel unfortunately, so we use
 				// string prefixes...
@@ -59,7 +61,7 @@ func remoteRefUpdateTimes(p string) map[string]time.Time {
 		}
 		return nil
 	}); err != nil {
-		slog.Warn("Failed to get remote refs.", errAttr(err), dataAttrs(slog.String("path", p)))
+		slog.Warn("Failed to get remote refs.", except.LogErrAttr(err), dataAttrs(slog.String("path", p)))
 	}
 	return refs
 }
@@ -115,7 +117,7 @@ func FindTargets(root string) ([]Target, error) {
 func isGitDir(path string) bool {
 	entries, err := fs.ReadDir(fileSystem, path)
 	if err != nil {
-		slog.Warn("Git directory read failed.", errAttr(err))
+		slog.Warn("Git directory read failed.", except.LogErrAttr(err))
 		return false
 	}
 	names := make(map[string]bool)

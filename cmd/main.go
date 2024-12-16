@@ -3,15 +3,47 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 
+	"github.com/adrg/xdg"
 	gitfetcher "github.com/mtth/gitfetcher/internal"
+	"github.com/mtth/gitfetcher/internal/except"
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	var errs []error
+
+	fp, ok := os.LookupEnv("LOGS_DIRECTORY")
+	if !ok {
+		var err error
+		fp, err = xdg.StateFile("gitfetcher/log")
+		if err != nil {
+			errs = append(errs, err)
+			fp = "gitfetcher.log"
+		}
+	}
+
+	var writer io.Writer
+	if file, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		writer = file
+	} else {
+		errs = append(errs, err)
+		writer = os.Stdout
+	}
+
+	handler := slog.NewJSONHandler(writer, &slog.HandlerOptions{Level: slog.LevelDebug})
+	slog.SetDefault(slog.New(handler))
+	if len(errs) > 0 {
+		slog.Error("Log setup failed.", except.LogErrAttr(errors.Join(errs...)))
+	}
+}
+
 func main() {
-	gitfetcher.SetupLogging()
 	ctx := context.Background()
 
 	syncCmd := &cobra.Command{
