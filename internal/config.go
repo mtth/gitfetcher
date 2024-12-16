@@ -26,6 +26,8 @@ var (
 	errInvalidConfig = errors.New("invalid configuration")
 )
 
+var filepathAbs = filepath.Abs
+
 // ParseConfig returns a parsed configuration from a given path. The path may either point to a
 // configuration file or a folder, in which case the default configuration file name will be used.
 // The configuration's root will be automatically populated.
@@ -53,7 +55,7 @@ func ParseConfig(fp string) (*configpb.Config, error) {
 		if cfg.GetOptions() == nil {
 			cfg.Options = &configpb.Options{}
 		}
-		base, err := filepath.Abs(filepath.Dir(fp))
+		base, err := filepathAbs(filepath.Dir(fp))
 		if err != nil {
 			return nil, err
 		}

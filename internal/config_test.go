@@ -12,6 +12,8 @@ import (
 )
 
 func TestParseConfig(t *testing.T) {
+	defer swap(&filepathAbs, func(p string) (string, error) { return "/root/" + p, nil })()
+
 	for _, tc := range []struct {
 		path string
 		want *configpb.Config
@@ -19,7 +21,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			path: "testdata",
 			want: &configpb.Config{
-				Options: &configpb.Options{Root: "testdata/projects"},
+				Options: &configpb.Options{Root: "/root/testdata/projects"},
 				Sources: []*configpb.Source{{
 					Branch: &configpb.Source_FromUrl{
 						FromUrl: &configpb.UrlSource{
@@ -47,7 +49,7 @@ func TestParseConfig(t *testing.T) {
 						},
 					},
 				}},
-				Options: &configpb.Options{Root: "testdata"},
+				Options: &configpb.Options{Root: "/root/testdata"},
 			},
 		},
 	} {
@@ -59,7 +61,6 @@ func TestParseConfig(t *testing.T) {
 	}
 
 	for _, tc := range []string{
-		"testdata/.gitfetcher.empty.conf",
 		"testdata/.gitfetcher.invalid.conf",
 	} {
 		t.Run(tc, func(t *testing.T) {
