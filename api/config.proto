@@ -24,7 +24,10 @@ message Options {
     // Bare repository, without a worktree.
     BARE_LAYOUT = 1;
   }
-  Layout layout = 2;
+
+  // Layout used when initializing a new repository. Repositories which already
+  // exist locally are not affected by this setting.
+  Layout init_layout = 2;
 }
 
 message Source {
@@ -42,7 +45,9 @@ message UrlSource {
   // possible (e.g. for GitHub repositories), falling back to main otherwise.
   string default_branch = 2;
 
-  // Local repository path override, relative to the root.
+  // Local repository path override, relative to the root. The default is
+  // inferred from the the URL's path without any extension, suffixed with .git
+  // for bare repositories.
   string path = 3;
 }
 
