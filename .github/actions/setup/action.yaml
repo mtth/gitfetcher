@@ -32,7 +32,7 @@ runs:
       shell: bash
       run: |
         mkdir bin
-        go build -o ./bin main.go
+        go build -o ./bin/gitfetcher main.go
     - name: Lint Go
       if: inputs.lint == 'true'
       uses: golangci/golangci-lint-action@v6
