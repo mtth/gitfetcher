@@ -36,6 +36,7 @@ type Source struct {
 	fetchFlags []string
 }
 
+// FullName derives a repo's full name.
 func FullName(u *url.URL) string {
 	return strings.TrimPrefix(strings.TrimSuffix(u.Path, ".git"), "/")
 }

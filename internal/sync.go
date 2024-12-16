@@ -240,11 +240,9 @@ func fileExists(fp string) bool {
 }
 
 // runCommand executes a command, panicking if it fails.
-func runCommand(ctx context.Context, cwd, name string, args []string) string {
+func runCommand(ctx context.Context, cwd, name string, args []string) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = cwd
-	stdout, err := cmd.StdoutPipe()
-	checkSyncStep(err)
 	stderr, err := cmd.StderrPipe()
 	checkSyncStep(err)
 	checkSyncStep(cmd.Start())
@@ -252,6 +250,4 @@ func runCommand(ctx context.Context, cwd, name string, args []string) string {
 	if err := cmd.Wait(); err != nil {
 		checkSyncStep(fmt.Errorf("%w: %v", err, string(errData)))
 	}
-	outData, _ := io.ReadAll(stdout)
-	return string(outData)
 }
