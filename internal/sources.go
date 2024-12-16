@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"net/url"
 	"os"
-	"regexp"
+	"path"
 	"strings"
 	"time"
 
@@ -19,39 +20,55 @@ import (
 
 // Source captures information about a repository to be mirrored.
 type Source struct {
-	FullName, FetchURL, Description, DefaultBranch, Path string
-	LastUpdatedAt                                        time.Time
-	fetchFlags                                           []string
+	// Qualified repository name, typically $owner/$name. Non-empty.
+	FullName string
+	// URL used to fetch repository updates. Non-empty.
+	FetchURL string
+	// Optional human-readable description. May be empty.
+	Description string
+	// Default branch. May be empty.
+	DefaultBranch string
+	// Local relative path override. May be empty.
+	RelPath string
+	// Last time the remote repository was updated. Zero if unknown.
+	LastUpdatedAt time.Time
+	// Git flags used to fetch repository updates.
+	fetchFlags []string
 }
 
-// GatherSources returns all sources for the provided configuration.
-func GatherSources(ctx context.Context, cfg *configpb.Config) ([]*Source, error) {
+func FullName(u *url.URL) string {
+	return strings.TrimPrefix(strings.TrimSuffix(u.Path, ".git"), "/")
+}
+
+// LoadSources returns all sources for the provided configuration.
+func LoadSources(ctx context.Context, configs []*configpb.Source) ([]Source, error) {
 	slog.Debug("Gathering sources...")
 
 	var builder sourcesBuilder
 	gatherer := &sourceGatherer{builder: &builder, githubClient: github.NewClient(nil)}
-
 	var errs []error
-	for _, src := range cfg.GetSources() {
+	for _, config := range configs {
 		var err error
-		switch b := src.GetBranch().(type) {
+		switch b := config.GetBranch().(type) {
 		case *configpb.Source_FromUrl:
 			err = gatherer.gatherURLSource(ctx, b.FromUrl)
 		case *configpb.Source_FromGithubToken:
 			err = gatherer.gatherGithubTokenSources(ctx, b.FromGithubToken)
 		default:
-			return nil, fmt.Errorf("%w: %v", errUnexpectedConfig, cfg)
+			return nil, fmt.Errorf("%w: %v", errUnexpectedConfig, config)
 		}
 		errs = append(errs, err)
 	}
 
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
 	srcs := builder.build()
-	err := errors.Join(errs...)
-	slog.Info(fmt.Sprintf("Found %v source(s).", len(srcs)), errAttr(err))
-	return srcs, err
+	slog.Info(fmt.Sprintf("Found %v source(s).", len(srcs)))
+	return srcs, nil
 }
 
-type sourcesBuilder []*Source
+type sourcesBuilder []Source
 
 type sourceOptions struct {
 	defaultBranch, path string
@@ -59,25 +76,23 @@ type sourceOptions struct {
 	remoteProtocol      configpb.GithubTokenSource_RemoteProtocol
 }
 
-const defaultBranch = "main"
-
-func (b *sourcesBuilder) addStandardURLRepo(url string, name string, opts sourceOptions) {
-	*b = append(*b, &Source{
-		FullName:      name,
-		FetchURL:      url,
-		DefaultBranch: cmp.Or(opts.defaultBranch, defaultBranch),
-		Path:          opts.path,
+func (b *sourcesBuilder) addStandardURLRepo(u *url.URL, opts sourceOptions) {
+	*b = append(*b, Source{
+		FullName:      FullName(u),
+		FetchURL:      u.String(),
+		DefaultBranch: opts.defaultBranch,
+		RelPath:       opts.path,
 		fetchFlags:    opts.fetchFlags,
 	})
 }
 
 func (b *sourcesBuilder) addGithubRepo(repo *github.Repository, opts sourceOptions) {
-	src := &Source{
+	src := Source{
 		FullName:      repo.GetFullName(),
 		Description:   repo.GetDescription(),
-		DefaultBranch: cmp.Or(opts.defaultBranch, repo.GetDefaultBranch(), defaultBranch),
+		DefaultBranch: cmp.Or(opts.defaultBranch, repo.GetDefaultBranch()),
 		LastUpdatedAt: repo.GetUpdatedAt().Time,
-		Path:          opts.path,
+		RelPath:       opts.path,
 		fetchFlags:    opts.fetchFlags,
 	}
 	switch opts.remoteProtocol {
@@ -89,15 +104,15 @@ func (b *sourcesBuilder) addGithubRepo(repo *github.Repository, opts sourceOptio
 	*b = append(*b, src)
 }
 
-func (b *sourcesBuilder) build() []*Source {
-	return ([]*Source)(*b)
+func (b *sourcesBuilder) build() []Source {
+	return ([]Source)(*b)
 }
 
 var (
 	errInvalidGithubToken = errors.New("invalid GitHub token")
 	errInvalidPath        = errors.New("invalid path")
 	errUnexpectedConfig   = errors.New("unexpected config")
-	errUnsupportedURL     = errors.New("unsupported URL")
+	errInvalidURL         = errors.New("invalid URL")
 )
 
 // sourceGatherer is a GitHub-backed sourcesGatherer implementation.
@@ -106,33 +121,30 @@ type sourceGatherer struct {
 	githubClient *github.Client
 }
 
-var standardURLPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/?$`)
-
 func (c *sourceGatherer) gatherURLSource(
 	ctx context.Context,
 	cfg *configpb.UrlSource,
 ) error {
-	url := cfg.GetUrl()
-	matches := standardURLPattern.FindStringSubmatch(url)
-	if matches == nil {
-		return fmt.Errorf("%w: %s", errUnsupportedURL, url)
+	repoURL, err := url.Parse(cfg.GetUrl())
+	if err != nil {
+		return fmt.Errorf("%w: %s", errInvalidURL, cfg.GetUrl())
 	}
 	opts := sourceOptions{
 		defaultBranch: cfg.GetDefaultBranch(),
 		path:          cfg.GetPath(),
 	}
-	suffix := strings.TrimSuffix(matches[3], ".git")
-	switch matches[1] {
+	switch repoURL.Hostname() {
 	case "github.com":
-		repo, _, err := c.githubClient.Repositories.Get(ctx, matches[2], suffix)
+		folder, name := path.Split(FullName(repoURL))
+		repo, _, err := c.githubClient.Repositories.Get(ctx, strings.TrimSuffix(folder, "/"), name)
 		if err != nil {
-			return fmt.Errorf("unable to get source from URL %s: %w", url, err)
+			return fmt.Errorf("unable to get source from URL %v: %w", repoURL, err)
 		}
 		c.builder.addGithubRepo(repo, opts)
 	default:
-		c.builder.addStandardURLRepo(url, fmt.Sprintf("%s/%s", matches[2], suffix), opts)
+		c.builder.addStandardURLRepo(repoURL, opts)
 	}
-	slog.Debug("Added URL source.", dataAttrs(slog.String("url", url)))
+	slog.Debug("Added URL source.", dataAttrs(slog.String("url", repoURL.String())))
 	return nil
 }
 

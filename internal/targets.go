@@ -24,12 +24,25 @@ type Target struct {
 	Path string
 	// IsBare is true iff the repository does not have a working directory.
 	IsBare bool
+	// LastUpdatedAt is the most recent time at which a remote reference was updated. May be zero.
+	RemoteLastUpdatedAt time.Time
 }
 
-// RemoteRefs returns information about the repository's remote git references.
-func (t *Target) RemoteRefs() map[string]time.Time {
+// TargetFromPath creates a Target from a local path.
+func TargetFromPath(p string) Target {
+	var maxTime time.Time
+	for _, remoteTime := range remoteRefUpdateTimes(p) {
+		if remoteTime.After(maxTime) {
+			maxTime = remoteTime
+		}
+	}
+	return Target{Path: p, IsBare: path.Base(p) != ".git", RemoteLastUpdatedAt: maxTime}
+}
+
+// RemoteRefs returns information about the repository's remote git references from a gitdir path.
+func remoteRefUpdateTimes(p string) map[string]time.Time {
 	refs := make(map[string]time.Time)
-	root := path.Join(t.Path, "refs/remotes", remote)
+	root := path.Join(p, "refs/remotes", remote)
 	if err := fs.WalkDir(fileSystem, root, func(fp string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -46,7 +59,7 @@ func (t *Target) RemoteRefs() map[string]time.Time {
 		}
 		return nil
 	}); err != nil {
-		slog.Warn("Failed to get remote refs.", errAttr(err), dataAttrs(slog.String("path", t.Path)))
+		slog.Warn("Failed to get remote refs.", errAttr(err), dataAttrs(slog.String("path", p)))
 	}
 	return refs
 }
@@ -69,7 +82,9 @@ func FindTargets(root string) ([]Target, error) {
 
 	depths := make(map[string]uint8)
 	var targets []Target
-	if err := fs.WalkDir(fileSystem, root, func(fp string, entry fs.DirEntry, err error) error {
+	// TODO: fs.WalkDir behaves strangely with absolute roots. Investigate if there is a cleaner way
+	// to implement this which also supports testing (ideally still via testfs).
+	if err := fs.WalkDir(fileSystem, strings.TrimPrefix(root, "/"), func(fp string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -82,7 +97,7 @@ func FindTargets(root string) ([]Target, error) {
 			return fs.SkipDir
 		}
 		if isGitDir(fp) {
-			targets = append(targets, Target{Path: fp, IsBare: entry.Name() != ".git"})
+			targets = append(targets, TargetFromPath("/"+fp))
 			return fs.SkipDir
 		}
 		depths[fp] = depth

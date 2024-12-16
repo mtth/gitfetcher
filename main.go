@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	gitfetcher "github.com/mtth/gitfetcher/internal"
 	"github.com/spf13/cobra"
@@ -18,15 +19,16 @@ func main() {
 		Short: "Sync repositories",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			cfg, err := loadConfig(args)
+			syncables, err := gatherSyncables(ctx, args)
 			if err != nil {
 				return err
 			}
-			srcs, err := gitfetcher.FindSources(ctx, cfg)
-			if err != nil {
-				return err
+			for _, syncable := range syncables {
+				if err := syncable.Sync(ctx); err != nil {
+					return err
+				}
 			}
-			return gitfetcher.Sync(ctx, srcs, cfg.GetOptions())
+			return nil
 		},
 	}
 
@@ -35,17 +37,13 @@ func main() {
 		Short: "Show repository statuses",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			cfg, err := loadConfig(args)
+			syncables, err := gatherSyncables(ctx, args)
 			if err != nil {
 				return err
 			}
-			srcs, err := gitfetcher.FindSources(ctx, cfg)
-			if err != nil {
-				return err
-			}
-			for _, src := range srcs {
-				status := gitfetcher.GetSyncStatus(src, cfg.GetOptions())
-				fmt.Printf("%v\t%s\t%s\n", status, src.FullName, src.FetchURL) //nolint:forbidigo
+			for _, syncable := range syncables {
+				status := syncable.SyncStatus()
+				fmt.Printf("%v\t%s\n", status, syncable.Path) //nolint:forbidigo
 			}
 			return nil
 		},
@@ -56,7 +54,26 @@ func main() {
 	rootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
 	rootCmd.AddCommand(syncCmd, statusCmd)
 
-	_ = rootCmd.ExecuteContext(ctx)
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
+		os.Exit(1)
+	}
+}
+
+func gatherSyncables(ctx context.Context, args []string) ([]gitfetcher.Syncable, error) {
+	config, err := loadConfig(args)
+	if err != nil {
+		return nil, err
+	}
+	root := config.GetOptions().GetRoot()
+	targets, err := gitfetcher.FindTargets(root)
+	if err != nil {
+		return nil, err
+	}
+	sources, err := gitfetcher.LoadSources(ctx, config.GetSources())
+	if err != nil {
+		return nil, err
+	}
+	return gitfetcher.GatherSyncables(targets, sources, root, config.GetOptions().GetInitLayout())
 }
 
 func loadConfig(args []string) (*gitfetcher.Config, error) {
