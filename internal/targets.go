@@ -41,11 +41,15 @@ func TargetFromPath(p string) Target {
 	return Target{Path: p, IsBare: path.Base(p) != ".git", RemoteLastUpdatedAt: maxTime}
 }
 
+func unabs(p string) string {
+	return strings.TrimPrefix(p, "/")
+}
+
 // RemoteRefs returns information about the repository's remote git references from a gitdir path.
 func remoteRefUpdateTimes(p string) map[string]time.Time {
 	refs := make(map[string]time.Time)
 	root := path.Join(p, "refs/remotes", remote)
-	if err := fs.WalkDir(fileSystem, root, func(fp string, entry fs.DirEntry, err error) error {
+	if err := fs.WalkDir(fileSystem, unabs(root), func(fp string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -86,11 +90,10 @@ func FindTargets(root string) ([]Target, error) {
 	var targets []Target
 	// TODO: fs.WalkDir behaves strangely with absolute roots. Investigate if there is a cleaner way
 	// to implement this which also supports testing (ideally still via testfs).
-	if err := fs.WalkDir(fileSystem, strings.TrimPrefix(root, "/"), func(fp string, entry fs.DirEntry, err error) error {
+	if err := fs.WalkDir(fileSystem, unabs(root), func(fp string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		slog.Debug("Walking directory entry.", dataAttrs(slog.String("path", fp), slog.String("name", entry.Name())))
 		if !entry.IsDir() {
 			return nil
 		}
@@ -115,7 +118,7 @@ func FindTargets(root string) ([]Target, error) {
 // isGitDir returns whether path is a valid git directory. The logic is a simplified version of the
 // flow in https://stackoverflow.com/a/65499840 and may lead to false positives.
 func isGitDir(path string) bool {
-	entries, err := fs.ReadDir(fileSystem, path)
+	entries, err := fs.ReadDir(fileSystem, unabs(path))
 	if err != nil {
 		slog.Warn("Git directory read failed.", except.LogErrAttr(err))
 		return false

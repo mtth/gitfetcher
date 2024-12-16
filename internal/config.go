@@ -62,6 +62,6 @@ func ParseConfig(fp string) (*configpb.Config, error) {
 		cfg.Options.Root = path.Join(filepath.ToSlash(base), root)
 	}
 
-	slog.Info("Read config.", dataAttrs(slog.String("path", fp), slog.String("root", root)))
+	slog.Info("Read config.", dataAttrs(slog.String("path", fp)))
 	return &cfg, nil
 }
