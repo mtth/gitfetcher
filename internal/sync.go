@@ -13,23 +13,12 @@ import (
 	"os/exec"
 	"path"
 	"slices"
+	"time"
 
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 )
 
 var errDuplicateSource = errors.New("duplicate source path")
-
-// Syncable contains all the information needed to mirror a repository.
-type Syncable struct {
-	// Absolute local path to the repository's gitdir.
-	Path string
-	// Local target, if any.
-	target *Target
-	// Mirror source, if any. Present if target is nil.
-	source *Source
-	// True iff the repository should be created bare.
-	bareInit bool
-}
 
 // GatherSyncables reconciles targets and sources into Syncable instances.
 func GatherSyncables(
@@ -48,9 +37,10 @@ func GatherSyncables(
 			fp = source.FullName
 			if initLayout == configpb.Options_BARE_LAYOUT {
 				fp += ".git"
-			} else {
-				fp = path.Join(fp, ".git")
 			}
+		}
+		if initLayout != configpb.Options_BARE_LAYOUT {
+			fp = path.Join(fp, ".git")
 		}
 		fp = path.Join(root, fp)
 		if _, ok := sourcesByPath[fp]; ok {
@@ -62,7 +52,7 @@ func GatherSyncables(
 	// Then we iterate over targets to create syncables, adding a source if available.
 	syncablesByPath := make(map[string]Syncable)
 	for _, target := range targets {
-		syncable := Syncable{Path: target.Path, target: &target}
+		syncable := Syncable{gitDirPath: target.Path, target: &target}
 		if source, ok := sourcesByPath[target.Path]; ok {
 			syncable.source = source
 		}
@@ -72,14 +62,58 @@ func GatherSyncables(
 	bareInit := initLayout == configpb.Options_BARE_LAYOUT
 	for fp, source := range sourcesByPath {
 		if _, ok := syncablesByPath[fp]; !ok {
-			syncablesByPath[fp] = Syncable{Path: fp, source: source, bareInit: bareInit}
+			syncablesByPath[fp] = Syncable{gitDirPath: fp, source: source, bareInit: bareInit}
 		}
 	}
 
 	slog.Info(fmt.Sprintf("Gathered %v syncables.", len(syncablesByPath)))
 	syncables := slices.Collect(maps.Values(syncablesByPath))
-	slices.SortFunc(syncables, func(s1, s2 Syncable) int { return cmp.Compare(s1.Path, s2.Path) })
+	slices.SortFunc(syncables, func(s1, s2 Syncable) int { return cmp.Compare(s1.gitDirPath, s2.gitDirPath) })
 	return syncables, nil
+}
+
+// Syncable contains all the information needed to mirror a repository.
+type Syncable struct {
+	// Absolute local path to the repository's gitdir.
+	gitDirPath string
+	// Local target, if any.
+	target *Target
+	// Mirror source, if any. Present if target is nil.
+	source *Source
+	// True iff the repository should be created bare.
+	bareInit bool
+}
+
+func (s *Syncable) Path() string {
+	return cmp.Or(s.workDirPath(), s.gitDirPath)
+}
+
+func (s *Syncable) SourceLastUpdatedAt() time.Time {
+	if source := s.source; source != nil {
+		return source.LastUpdatedAt
+	}
+	return time.Time{}
+}
+
+func (s *Syncable) TargetLastUpdatedAt() time.Time {
+	if target := s.target; target != nil {
+		return target.RemoteLastUpdatedAt
+	}
+	return time.Time{}
+}
+
+func (s *Syncable) isBare() bool {
+	if target := s.target; target != nil {
+		return target.IsBare
+	}
+	return s.bareInit
+}
+
+func (s *Syncable) workDirPath() string {
+	if s.isBare() {
+		return ""
+	}
+	return path.Dir(s.gitDirPath)
 }
 
 // SyncStatus returns the current SyncStatus of the syncable.
@@ -147,7 +181,7 @@ func (s *Syncable) Sync(ctx context.Context) (err error) {
 }
 
 func (s *Syncable) createTarget(ctx context.Context) {
-	checkSyncStep(os.MkdirAll(s.Path, 0755))
+	checkSyncStep(os.MkdirAll(s.gitDirPath, 0755))
 
 	// We don't use git clone to avoid having the credentials saved in the repo's config and share
 	// more logic with the update function below.
@@ -158,10 +192,10 @@ func (s *Syncable) createTarget(ctx context.Context) {
 	if s.bareInit {
 		initArgs = append(initArgs, "--bare")
 	}
-	runGitCommand(ctx, s.Path, initArgs)
+	runGitCommand(ctx, s.gitDirPath, initArgs)
 
 	// TODO: Confirm that we do not need -m to specify a branch when adding the remote.
-	runGitCommand(ctx, s.Path, []string{"remote", "add", remote, s.source.FetchURL})
+	runGitCommand(ctx, s.gitDirPath, []string{"remote", "add", remote, s.source.FetchURL})
 
 	slog.Debug("Created target.")
 }
@@ -173,20 +207,6 @@ func (s *Syncable) defaultRemoteRef() string {
 	return ""
 }
 
-func (s *Syncable) isBare() bool {
-	if target := s.target; target != nil {
-		return target.IsBare
-	}
-	return s.bareInit
-}
-
-func (s *Syncable) gitPath(lp string) string {
-	if !s.isBare() {
-		lp = path.Join(".git", lp)
-	}
-	return path.Join(s.Path, lp)
-}
-
 func (s *Syncable) updateContents(ctx context.Context) {
 	slog.Debug("Updating contents...")
 
@@ -194,21 +214,21 @@ func (s *Syncable) updateContents(ctx context.Context) {
 	if source := s.source; source != nil {
 		fetchFlags = append(fetchFlags, source.fetchFlags...)
 	}
-	runGitCommand(ctx, s.Path, fetchFlags)
+	runGitCommand(ctx, s.gitDirPath, fetchFlags)
 
 	if s.isBare() {
 		// Update HEAD directly so that gitweb shows the most recent remote commit.
 		if ref := s.defaultRemoteRef(); ref != "" {
-			runGitCommand(ctx, s.Path, []string{"update-ref", "refs/heads/HEAD", ref})
+			runGitCommand(ctx, s.gitDirPath, []string{"update-ref", "refs/heads/HEAD", ref})
 		}
 	} else {
-		if !fileExists(s.gitPath("refs/heads/HEAD")) {
+		if !fileExists(path.Join(s.gitDirPath, "refs/heads/HEAD")) {
 			// No working directory yet.
 			if source := s.source; source != nil && source.DefaultBranch != "" {
-				runGitCommand(ctx, s.Path, []string{"checkout", source.DefaultBranch})
+				runGitCommand(ctx, s.gitDirPath, []string{"checkout", source.DefaultBranch})
 			}
 		} else {
-			runGitCommand(ctx, s.Path, []string{"merge", "--ff-only"})
+			runGitCommand(ctx, s.gitDirPath, []string{"merge", "--ff-only"})
 		}
 	}
 	slog.Debug("Updated contents.")
@@ -216,13 +236,13 @@ func (s *Syncable) updateContents(ctx context.Context) {
 
 func (s *Syncable) updateMetadata(ctx context.Context) {
 	if source := s.source; source != nil {
-		runGitCommand(ctx, s.Path, []string{"config", "set", "gitweb.url", source.FetchURL})
+		runGitCommand(ctx, s.gitDirPath, []string{"config", "set", "gitweb.url", source.FetchURL})
 
 		// This allows the remote branches to show up in the summary page's HEADS section.
-		runGitCommand(ctx, s.Path, []string{"config", "set", "gitweb.extraBranchRefs", "remotes"})
+		runGitCommand(ctx, s.gitDirPath, []string{"config", "set", "gitweb.extraBranchRefs", "remotes"})
 
 		if desc := source.Description; desc != "" {
-			checkSyncStep(os.WriteFile(s.gitPath("description"), []byte(desc), 0644))
+			checkSyncStep(os.WriteFile(path.Join(s.gitDirPath, "description"), []byte(desc), 0644))
 		}
 	}
 	slog.Debug("Updated metadata.")

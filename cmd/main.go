@@ -8,8 +8,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/adrg/xdg"
+	humanize "github.com/dustin/go-humanize"
 	gitfetcher "github.com/mtth/gitfetcher/internal"
 	"github.com/mtth/gitfetcher/internal/except"
 	"github.com/spf13/cobra"
@@ -75,7 +77,13 @@ func main() {
 			}
 			for _, syncable := range syncables {
 				status := syncable.SyncStatus()
-				fmt.Printf("%v\t%s\n", status, syncable.Path) //nolint:forbidigo
+				fmt.Printf( //nolint:forbidigo
+					"%v\t%s\t%s\t%s\n",
+					status,
+					formatTime(syncable.TargetLastUpdatedAt()),
+					formatTime(syncable.SourceLastUpdatedAt()),
+					syncable.Path(),
+				)
 			}
 			return nil
 		},
@@ -114,4 +122,11 @@ func loadConfig(args []string) (*gitfetcher.Config, error) {
 		fp = args[0]
 	}
 	return gitfetcher.ParseConfig(fp)
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return "-           "
+	}
+	return humanize.Time(t)
 }
