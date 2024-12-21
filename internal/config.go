@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
@@ -24,6 +25,8 @@ var (
 	errMissingConfig = errors.New("missing configuration")
 	errInvalidConfig = errors.New("invalid configuration")
 )
+
+var filepathAbs = filepath.Abs
 
 // ParseConfig returns a parsed configuration from a given path. The path may either point to a
 // configuration file or a folder, in which case the default configuration file name will be used.
@@ -46,18 +49,19 @@ func ParseConfig(fp string) (*configpb.Config, error) {
 	if err := prototext.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("%w: %v", errInvalidConfig, err)
 	}
-	if len(cfg.GetSources()) == 0 {
-		return nil, fmt.Errorf("%w: empty contents", errInvalidConfig)
-	}
 
 	root := cfg.GetOptions().GetRoot()
 	if !filepath.IsAbs(root) {
 		if cfg.GetOptions() == nil {
 			cfg.Options = &configpb.Options{}
 		}
-		cfg.Options.Root = filepath.Join(filepath.Dir(fp), root)
+		base, err := filepathAbs(filepath.Dir(fp))
+		if err != nil {
+			return nil, err
+		}
+		cfg.Options.Root = path.Join(filepath.ToSlash(base), root)
 	}
 
-	slog.Info("Read config.", dataAttrs(slog.String("path", fp), slog.String("root", root)))
+	slog.Info("Read config.", dataAttrs(slog.String("path", fp)))
 	return &cfg, nil
 }

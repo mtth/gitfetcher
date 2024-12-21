@@ -16,6 +16,8 @@ linters-settings:
     import-require-single-import: true
   nakedret:
     max-func-lines: 50
+  nestif:
+    min-complexity: 7
   nolintlint:
     require-specific: true
   testifylint:
