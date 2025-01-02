@@ -14,6 +14,7 @@ import (
 
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 	"github.com/mtth/gitfetcher/internal/except"
+	"github.com/mtth/gitfetcher/internal/fspath"
 	"google.golang.org/protobuf/encoding/prototext"
 )
 
@@ -27,7 +28,7 @@ var (
 	errMissingConfig = errors.New("configuration not found")
 )
 
-func FindConfig(dpath string) (*configpb.Config, error) {
+func FindConfig(dpath fspath.Local) (*configpb.Config, error) {
 	slog.Debug("Finding config...", slog.String("from", dpath))
 	child := dpath
 	for {
@@ -52,7 +53,7 @@ func FindConfig(dpath string) (*configpb.Config, error) {
 	}
 }
 
-func ReadConfig(fpath string) (*configpb.Config, error) {
+func ReadConfig(fpath fspath.Local) (*configpb.Config, error) {
 	slog.Debug("Reading config...", slog.String("path", fpath))
 	cfg, err := readConfig(fpath)
 	if errors.Is(err, os.ErrNotExist) {
@@ -67,7 +68,7 @@ func ReadConfig(fpath string) (*configpb.Config, error) {
 
 var filepathAbs = filepath.Abs
 
-func readConfig(fpath string) (*configpb.Config, error) {
+func readConfig(fpath fspath.Local) (*configpb.Config, error) {
 	data, err := os.ReadFile(fpath)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", errMissingConfig, err)
@@ -80,7 +81,7 @@ func readConfig(fpath string) (*configpb.Config, error) {
 	return &cfg, nil
 }
 
-func ensureRootAbsolute(cfg *configpb.Config, dpath string) {
+func ensureRootAbsolute(cfg *configpb.Config, dpath fspath.Local) {
 	root := cfg.GetOptions().GetRoot()
 	if filepath.IsAbs(root) {
 		return

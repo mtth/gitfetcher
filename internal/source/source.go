@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/go-github/v66/github"
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
+	"github.com/mtth/gitfetcher/internal/fspath"
 )
 
 // Concepts:
@@ -31,7 +32,7 @@ type Source struct {
 	// Default branch. May be empty.
 	DefaultBranch string
 	// Local relative path override. May be empty.
-	RelPath string
+	RelPath fspath.POSIX
 	// Last time the remote repository was updated. Zero if unknown.
 	LastUpdatedAt time.Time
 	// URL used to fetch repository updates. Non-empty.
@@ -43,9 +44,10 @@ type Source struct {
 type sourcesBuilder []Source
 
 type sourceOptions struct {
-	defaultBranch, path string
-	fetchFlags          []string
-	remoteProtocol      configpb.RemoteProtocol
+	defaultBranch  string
+	path           fspath.POSIX
+	fetchFlags     []string
+	remoteProtocol configpb.RemoteProtocol
 }
 
 func (b *sourcesBuilder) addStandardURLRepo(u *url.URL, opts sourceOptions) {

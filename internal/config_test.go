@@ -6,13 +6,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
+	"github.com/mtth/gitfetcher/internal/effect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
 )
 
 func TestReadConfig(t *testing.T) {
-	defer swap(&filepathAbs, func(p string) (string, error) { return "/root/" + p, nil })()
+	defer effect.Swap(&filepathAbs, func(p string) (string, error) { return "/root/" + p, nil })()
 
 	for _, tc := range []struct {
 		path string

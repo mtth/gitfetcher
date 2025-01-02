@@ -3,12 +3,16 @@ package gitfetcher
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
+	"github.com/mtth/gitfetcher/internal/effect"
+	"github.com/mtth/gitfetcher/internal/fspath"
 	"github.com/mtth/gitfetcher/internal/source"
+	"github.com/mtth/gitfetcher/internal/target"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -74,12 +78,12 @@ func TestSyncable_Sync(t *testing.T) {
 		},
 		"stale and up-to-date sources": func(t *testing.T, out fmt.Stringer) {
 			syncables, err := GatherSyncables(
-				[]Target{{
-					Path:                "/tmp/cool/stale/.git",
-					RemoteLastUpdatedAt: t0,
-				}, {
-					Path:                "/tmp/cool/up-to-date/.git",
-					RemoteLastUpdatedAt: t0,
+				[]target.Target{fakeTarget{
+					path:                "/tmp/cool/stale",
+					remoteLastUpdatedAt: t0,
+				}, fakeTarget{
+					path:                "/tmp/cool/up-to-date",
+					remoteLastUpdatedAt: t0,
 				}},
 				[]source.Source{{
 					FullName:      "cool/stale",
@@ -115,7 +119,7 @@ func TestSyncable_Sync(t *testing.T) {
 	} {
 		t.Run(key, func(t *testing.T) {
 			var b strings.Builder
-			defer swap(&runGitCommand, func(ctx context.Context, cwd string, args []string) {
+			defer effect.Swap(&runGitCommand, func(ctx context.Context, cwd string, args []string) {
 				b.WriteString(strings.Join(args, " "))
 				b.WriteString("\n")
 			})()
@@ -158,3 +162,31 @@ func TestRunGitCommand(t *testing.T) {
 	ctx := context.Background()
 	require.NotPanics(t, func() { runGitCommand(ctx, ".", []string{"status"}) })
 }
+
+/*
+func TestSyncable_RootDir(t *testing.T) {
+	for key, tc := range map[string]struct {
+		syncable Syncable
+		want     string
+	}{
+		"bare target": {
+			syncable: Syncable{
+				target: &Target{Path: "/foo/bar/.git", IsBare: false},
+			},
+		},
+	} {
+		t.Run(key, func(t *testing.T) {
+
+		})
+	}
+}
+*/
+
+type fakeTarget struct {
+	path                fspath.Local
+	remoteLastUpdatedAt time.Time
+}
+
+func (t fakeTarget) GitDir() fspath.Local           { return filepath.Join(t.WorkDir(), ".git") }
+func (t fakeTarget) WorkDir() fspath.Local          { return filepath.FromSlash(t.path) }
+func (t fakeTarget) RemoteLastUpdatedAt() time.Time { return t.remoteLastUpdatedAt }

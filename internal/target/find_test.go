@@ -1,18 +1,29 @@
-package gitfetcher
+package target
 
 import (
 	"io/fs"
+	"path/filepath"
 	"testing"
 	"testing/fstest"
 	"time"
 
+	"github.com/mtth/gitfetcher/internal/effect"
+	"github.com/mtth/gitfetcher/internal/fspath"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var emptyFile = &fstest.MapFile{}
 
-func TestFindTargets(t *testing.T) {
+func bare(dpath fspath.Local) Target {
+	return realTarget{gitDir: dpath}
+}
+
+func nonBare(dpath fspath.Local) Target {
+	return realTarget{gitDir: filepath.Join(dpath, gitDirName), workDir: dpath}
+}
+
+func TestFind(t *testing.T) {
 	t.Run("single repo", func(t *testing.T) {
 		defer swapFileSystem(fstest.MapFS{
 			"root/first/.git/HEAD":    emptyFile,
@@ -20,9 +31,9 @@ func TestFindTargets(t *testing.T) {
 			"root/first/.git/refs":    emptyFile,
 			"root/other":              emptyFile,
 		})()
-		targets, err := FindTargets("/root")
+		targets, err := Find("root")
 		require.NoError(t, err)
-		assert.Equal(t, []Target{{Path: "/root/first/.git"}}, targets)
+		assert.Equal(t, []Target{nonBare("root/first")}, targets)
 	})
 
 	t.Run("ignores folders", func(t *testing.T) {
@@ -31,7 +42,7 @@ func TestFindTargets(t *testing.T) {
 			"root/node_modules/.git/objects": emptyFile,
 			"root/node_modules/.git/refs":    emptyFile,
 		})()
-		targets, err := FindTargets("/root")
+		targets, err := Find("/root")
 		require.NoError(t, err)
 		assert.Empty(t, targets)
 	})
@@ -45,9 +56,9 @@ func TestFindTargets(t *testing.T) {
 			"root/parent/vendor/child/.git/objects": emptyFile,
 			"root/parent/vendor/child/.git/refs":    emptyFile,
 		})()
-		targets, err := FindTargets("/root")
+		targets, err := Find("root")
 		require.NoError(t, err)
-		assert.Equal(t, []Target{{Path: "/root/parent/.git"}}, targets)
+		assert.Equal(t, []Target{nonBare("root/parent")}, targets)
 	})
 
 	t.Run("multiple bare repositories", func(t *testing.T) {
@@ -59,12 +70,9 @@ func TestFindTargets(t *testing.T) {
 			"root/two.git/objects": emptyFile,
 			"root/two.git/refs":    emptyFile,
 		})()
-		targets, err := FindTargets("/root")
+		targets, err := Find("root")
 		require.NoError(t, err)
-		assert.Equal(t, []Target{
-			{Path: "/root/one.git", IsBare: true},
-			{Path: "/root/two.git", IsBare: true},
-		}, targets)
+		assert.Equal(t, []Target{bare("root/one.git"), bare("root/two.git")}, targets)
 	})
 }
 
@@ -87,5 +95,5 @@ func TestRemoteRefUpdateTimes(t *testing.T) {
 }
 
 func swapFileSystem(mapfs fstest.MapFS) func() {
-	return swap[fs.FS](&fileSystem, mapfs)
+	return effect.Swap[fs.FS](&fileSystem, mapfs)
 }

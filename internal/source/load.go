@@ -14,6 +14,7 @@ import (
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v66/github"
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
+	"github.com/mtth/gitfetcher/internal/fspath"
 )
 
 // Load returns all sources for the provided configuration.
@@ -141,7 +142,7 @@ func (c *sourceGatherer) gatherGithubTokenSources(
 	return nil
 }
 
-func githubSourcePath(tpl string, repo *github.Repository) (string, error) {
+func githubSourcePath(tpl string, repo *github.Repository) (fspath.POSIX, error) {
 	if tpl == "" {
 		return "", nil
 	}

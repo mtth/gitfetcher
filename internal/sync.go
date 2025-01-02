@@ -15,21 +15,24 @@ import (
 	"slices"
 
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
+	"github.com/mtth/gitfetcher/internal/fspath"
 	"github.com/mtth/gitfetcher/internal/source"
+	"github.com/mtth/gitfetcher/internal/target"
 )
 
 var errDuplicateSource = errors.New("duplicate source path")
 
 var (
+	FindTargets = target.Find
 	LoadSources = source.Load
 )
 
 // Syncable contains all the information needed to mirror a repository.
 type Syncable struct {
 	// Absolute local path to the repository's gitdir.
-	GitDir string
+	GitDir fspath.Local
 	// Local target, if any.
-	target *Target
+	target *target.Target
 	// Mirror source, if any. Present if target is nil.
 	source *source.Source
 	// True iff the repository should be created bare.
@@ -38,7 +41,7 @@ type Syncable struct {
 
 // GatherSyncables reconciles targets and sources into Syncable instances.
 func GatherSyncables(
-	targets []Target,
+	targets []target.Target,
 	sources []source.Source,
 	root string,
 	initLayout configpb.Options_Layout,
@@ -67,11 +70,12 @@ func GatherSyncables(
 	// Then we iterate over targets to create syncables, adding a source if available.
 	syncablesByPath := make(map[string]Syncable)
 	for _, target := range targets {
-		syncable := Syncable{GitDir: target.Path, target: &target}
-		if source, ok := sourcesByPath[target.Path]; ok {
+		gitDir := target.GitDir()
+		syncable := Syncable{GitDir: gitDir, target: &target}
+		if source, ok := sourcesByPath[gitDir]; ok {
 			syncable.source = source
 		}
-		syncablesByPath[target.Path] = syncable
+		syncablesByPath[gitDir] = syncable
 	}
 	// Finally, we look for sources which do not yet have a target.
 	bareInit := initLayout == configpb.Options_BARE_LAYOUT
@@ -94,7 +98,7 @@ func (s *Syncable) SyncStatus() SyncStatus {
 		return SyncStatusMissing
 	case s.source == nil || s.source.LastUpdatedAt.IsZero():
 		return SyncStatusUnknown
-	case s.target.RemoteLastUpdatedAt.Before(s.source.LastUpdatedAt):
+	case (*s.target).RemoteLastUpdatedAt().Before(s.source.LastUpdatedAt):
 		return SyncStatusStale
 	default:
 		return SyncStatusFresh
@@ -166,21 +170,21 @@ func (s *Syncable) createTarget(ctx context.Context) {
 	runGitCommand(ctx, s.GitDir, initArgs)
 
 	// TODO: Confirm that we do not need -m to specify a branch when adding the remote.
-	runGitCommand(ctx, s.GitDir, []string{"remote", "add", remote, s.source.FetchURL})
+	runGitCommand(ctx, s.GitDir, []string{"remote", "add", target.DefaultRemote, s.source.FetchURL})
 
 	slog.Debug("Created target.")
 }
 
 func (s *Syncable) defaultRemoteRef() string {
 	if source := s.source; source != nil && source.DefaultBranch != "" {
-		return fmt.Sprintf("refs/remotes/%s/%s", remote, source.DefaultBranch)
+		return fmt.Sprintf("refs/remotes/%s/%s", target.DefaultRemote, source.DefaultBranch)
 	}
 	return ""
 }
 
 func (s *Syncable) isBare() bool {
-	if target := s.target; target != nil {
-		return target.IsBare
+	if tgt := s.target; tgt != nil {
+		return target.IsBare(*tgt)
 	}
 	return s.bareInit
 }
