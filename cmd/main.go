@@ -79,7 +79,7 @@ func main() {
 			}
 			for _, syncable := range syncables {
 				status := syncable.SyncStatus()
-				fmt.Printf("%v\t%s\n", status, syncable.Path) //nolint:forbidigo
+				fmt.Printf("%v\t%s\n", status, syncable.RootDir()) //nolint:forbidigo
 			}
 			return nil
 		},
