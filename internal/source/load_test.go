@@ -1,4 +1,4 @@
-package gitfetcher
+package source
 
 import (
 	"context"
@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGatherSources_StandardURL(t *testing.T) {
+func TestLoadSources_StandardURL(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("single named repo", func(t *testing.T) {
-		srcs, err := LoadSources(ctx, []*configpb.Source{{
+		srcs, err := Load(ctx, []*configpb.Source{{
 			Branch: &configpb.Source_FromUrl{
 				FromUrl: &configpb.UrlSource{
 					Url:           "https://gitlab.archlinux.org/archlinux/devtools.git",
@@ -30,7 +30,7 @@ func TestGatherSources_StandardURL(t *testing.T) {
 	})
 
 	t.Run("invalid URL", func(t *testing.T) {
-		srcs, err := LoadSources(ctx, []*configpb.Source{{
+		srcs, err := Load(ctx, []*configpb.Source{{
 			Branch: &configpb.Source_FromUrl{
 				FromUrl: &configpb.UrlSource{
 					Url: "::/invalid.git",
@@ -42,11 +42,11 @@ func TestGatherSources_StandardURL(t *testing.T) {
 	})
 }
 
-func TestGatherSources_Github(t *testing.T) {
+func TestLoadSources_Github(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("single named repo", func(t *testing.T) {
-		srcs, err := LoadSources(ctx, []*configpb.Source{{
+		srcs, err := Load(ctx, []*configpb.Source{{
 			Branch: &configpb.Source_FromUrl{
 				FromUrl: &configpb.UrlSource{
 					Url: "https://github.com/mtth/gitfetcher",
@@ -60,7 +60,7 @@ func TestGatherSources_Github(t *testing.T) {
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
-		srcs, err := LoadSources(ctx, []*configpb.Source{{
+		srcs, err := Load(ctx, []*configpb.Source{{
 			Branch: &configpb.Source_FromGithubToken{
 				FromGithubToken: &configpb.GithubTokenSource{
 					Token: "abc",
@@ -76,11 +76,11 @@ func TestGatherSources_Github(t *testing.T) {
 			t.SkipNow()
 		}
 
-		srcs, err := LoadSources(ctx, []*configpb.Source{{
+		srcs, err := Load(ctx, []*configpb.Source{{
 			Branch: &configpb.Source_FromGithubToken{
 				FromGithubToken: &configpb.GithubTokenSource{
 					Token:          "$SOURCES_GITHUB_TOKEN",
-					RemoteProtocol: configpb.GithubTokenSource_SSH_REMOTE_PROTOCOL,
+					RemoteProtocol: configpb.RemoteProtocol_SSH_REMOTE_PROTOCOL,
 				},
 			},
 		}})

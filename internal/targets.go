@@ -65,14 +65,14 @@ func remoteRefUpdateTimes(p string) map[string]time.Time {
 		}
 		return nil
 	}); err != nil {
-		slog.Warn("Failed to get remote refs.", except.LogErrAttr(err), dataAttrs(slog.String("path", p)))
+		slog.Warn("Failed to get remote refs.", except.LogErrAttr(err), slog.String("path", p))
 	}
 	return refs
 }
 
 var (
 	// maxDepth is the maximum filesystem depth explored when searching for targets in FindTargets.
-	maxDepth uint8 = 5
+	maxDepth uint8 = 3
 
 	// ignoredFolders contains folder names which are ignored when searching for targets.
 	ignoredFolders = []string{"node_modules"}
@@ -84,7 +84,7 @@ var (
 // FindTargets walks the filesystem to find all repository targets under the root. Nested git
 // directories are ignored. The root directory is never considered a valid repository.
 func FindTargets(root string) ([]Target, error) {
-	slog.Debug("Finding targets", dataAttrs(slog.String("root", root)))
+	slog.Debug("Finding targets", slog.String("root", root))
 
 	depths := make(map[string]uint8)
 	var targets []Target
@@ -101,17 +101,9 @@ func FindTargets(root string) ([]Target, error) {
 		if depth > maxDepth || slices.Contains(ignoredFolders, entry.Name()) {
 			return fs.SkipDir
 		}
-		if ok, err := isGitDir(fp); ok {
+		if isGitDir(fp) {
 			targets = append(targets, TargetFromPath("/"+fp))
 			return fs.SkipDir
-		} else if err != nil {
-			slog.Warn("Git directory read failed.", except.LogErrAttr(err))
-		}
-		if ok, err := isGitDir(path.Join(fp, ".git")); ok {
-			targets = append(targets, TargetFromPath("/"+fp+"/.git"))
-			return fs.SkipDir
-		} else if err != fs.ErrNotExist {
-			slog.Warn("Git work directory read failed.", except.LogErrAttr(err))
 		}
 		depths[fp] = depth
 		return nil
@@ -123,16 +115,17 @@ func FindTargets(root string) ([]Target, error) {
 	return targets, nil
 }
 
-// isGitDir returns whether p is a valid git directory. The logic is a simplified version of the
+// isGitDir returns whether path is a valid git directory. The logic is a simplified version of the
 // flow in https://stackoverflow.com/a/65499840 and may lead to false positives.
-func isGitDir(p string) (bool, error) {
-	entries, err := fs.ReadDir(fileSystem, unabs(p))
+func isGitDir(path string) bool {
+	entries, err := fs.ReadDir(fileSystem, unabs(path))
 	if err != nil {
-		return false, err
+		slog.Warn("Git directory read failed.", except.LogErrAttr(err))
+		return false
 	}
 	names := make(map[string]bool)
 	for _, entry := range entries {
 		names[entry.Name()] = true
 	}
-	return names["HEAD"] && names["objects"] && names["refs"], nil
+	return names["HEAD"] && names["objects"] && names["refs"]
 }

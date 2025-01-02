@@ -8,6 +8,7 @@ import (
 	"time"
 
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
+	"github.com/mtth/gitfetcher/internal/source"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +22,7 @@ func TestSyncable_Sync(t *testing.T) {
 		"single bare missing source": func(t *testing.T, out fmt.Stringer) {
 			syncables, err := GatherSyncables(
 				nil,
-				[]Source{{
+				[]source.Source{{
 					FullName:      "cool/test",
 					FetchURL:      "http://example.com/test",
 					DefaultBranch: "main",
@@ -48,7 +49,7 @@ func TestSyncable_Sync(t *testing.T) {
 		"single missing source": func(t *testing.T, out fmt.Stringer) {
 			syncables, err := GatherSyncables(
 				nil,
-				[]Source{{
+				[]source.Source{{
 					FullName:      "cool/test",
 					FetchURL:      "http://example.com/test",
 					DefaultBranch: "main",
@@ -80,7 +81,7 @@ func TestSyncable_Sync(t *testing.T) {
 					Path:                "/tmp/cool/up-to-date/.git",
 					RemoteLastUpdatedAt: t0,
 				}},
-				[]Source{{
+				[]source.Source{{
 					FullName:      "cool/stale",
 					FetchURL:      "http://example.com/stale",
 					DefaultBranch: "main",
@@ -126,7 +127,7 @@ func TestSyncable_Sync(t *testing.T) {
 func TestGetSyncStatus(t *testing.T) {
 	t.Run("missing source", func(t *testing.T) {
 		syncable := Syncable{
-			source: &Source{
+			source: &source.Source{
 				FullName:      "cool/test",
 				FetchURL:      "http://example.com/up-to-date",
 				DefaultBranch: "main",

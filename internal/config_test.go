@@ -11,7 +11,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 )
 
-func TestParseConfig(t *testing.T) {
+func TestReadConfig(t *testing.T) {
 	defer swap(&filepathAbs, func(p string) (string, error) { return "/root/" + p, nil })()
 
 	for _, tc := range []struct {
@@ -19,7 +19,7 @@ func TestParseConfig(t *testing.T) {
 		want *configpb.Config
 	}{
 		{
-			path: "testdata",
+			path: "testdata/.gitfetcher.conf",
 			want: &configpb.Config{
 				Options: &configpb.Options{Root: "/root/testdata/projects"},
 				Sources: []*configpb.Source{{
@@ -45,7 +45,7 @@ func TestParseConfig(t *testing.T) {
 						FromGithubToken: &configpb.GithubTokenSource{
 							Token:          "secret-token",
 							Filters:        []string{"foo/*"},
-							RemoteProtocol: configpb.GithubTokenSource_SSH_REMOTE_PROTOCOL,
+							RemoteProtocol: configpb.RemoteProtocol_SSH_REMOTE_PROTOCOL,
 						},
 					},
 				}},
@@ -54,7 +54,7 @@ func TestParseConfig(t *testing.T) {
 		},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
-			got, err := ParseConfig(tc.path)
+			got, err := ReadConfig(tc.path)
 			require.NoError(t, err)
 			assert.Empty(t, cmp.Diff(tc.want, got, protocmp.Transform()))
 		})
@@ -64,7 +64,7 @@ func TestParseConfig(t *testing.T) {
 		"testdata/.gitfetcher.invalid.conf",
 	} {
 		t.Run(tc, func(t *testing.T) {
-			got, err := ParseConfig(tc)
+			got, err := ReadConfig(tc)
 			assert.Nil(t, got)
 			require.ErrorIs(t, err, errInvalidConfig)
 		})
@@ -75,7 +75,7 @@ func TestParseConfig(t *testing.T) {
 		"file":   ".",
 	} {
 		t.Run(fmt.Sprintf("missing %s", key), func(t *testing.T) {
-			got, err := ParseConfig(tc)
+			got, err := ReadConfig(tc)
 			assert.Nil(t, got)
 			require.ErrorIs(t, err, errMissingConfig)
 		})

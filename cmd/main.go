@@ -8,10 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/adrg/xdg"
-	humanize "github.com/dustin/go-humanize"
 	gitfetcher "github.com/mtth/gitfetcher/internal"
 	"github.com/mtth/gitfetcher/internal/except"
 	"github.com/spf13/cobra"
@@ -45,13 +43,17 @@ func init() {
 	}
 }
 
+var (
+	configPath string
+)
+
 func main() {
 	ctx := context.Background()
 
 	syncCmd := &cobra.Command{
-		Use:   "sync [PATH]",
+		Use:   "sync",
 		Short: "Sync repositories",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  cobra.MaximumNArgs(0),
 		RunE: func(_ *cobra.Command, args []string) error {
 			syncables, err := gatherSyncables(ctx, args)
 			if err != nil {
@@ -67,9 +69,9 @@ func main() {
 	}
 
 	statusCmd := &cobra.Command{
-		Use:   "status [PATH]",
+		Use:   "status",
 		Short: "Show repository statuses",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  cobra.MaximumNArgs(0),
 		RunE: func(_ *cobra.Command, args []string) error {
 			syncables, err := gatherSyncables(ctx, args)
 			if err != nil {
@@ -77,13 +79,7 @@ func main() {
 			}
 			for _, syncable := range syncables {
 				status := syncable.SyncStatus()
-				fmt.Printf( //nolint:forbidigo
-					"%v\t%s\t%s\t%s\n",
-					status,
-					formatTime(syncable.TargetLastUpdatedAt()),
-					formatTime(syncable.SourceLastUpdatedAt()),
-					syncable.Path(),
-				)
+				fmt.Printf("%v\t%s\n", status, syncable.Path) //nolint:forbidigo
 			}
 			return nil
 		},
@@ -92,6 +88,7 @@ func main() {
 	rootCmd := &cobra.Command{Use: "gitfetcher", SilenceUsage: true}
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
+	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "", "path to configuration")
 	rootCmd.AddCommand(syncCmd, statusCmd)
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
@@ -100,7 +97,7 @@ func main() {
 }
 
 func gatherSyncables(ctx context.Context, args []string) ([]gitfetcher.Syncable, error) {
-	config, err := loadConfig(args)
+	config, err := loadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -116,17 +113,9 @@ func gatherSyncables(ctx context.Context, args []string) ([]gitfetcher.Syncable,
 	return gitfetcher.GatherSyncables(targets, sources, root, config.GetOptions().GetInitLayout())
 }
 
-func loadConfig(args []string) (*gitfetcher.Config, error) {
-	fp := "."
-	if len(args) > 0 {
-		fp = args[0]
+func loadConfig() (*gitfetcher.Config, error) {
+	if configPath != "" {
+		return gitfetcher.ReadConfig(configPath)
 	}
-	return gitfetcher.ParseConfig(fp)
-}
-
-func formatTime(t time.Time) string {
-	if t.IsZero() {
-		return "-           "
-	}
-	return humanize.Time(t)
+	return gitfetcher.FindConfig(".")
 }

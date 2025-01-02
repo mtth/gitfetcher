@@ -37,6 +37,14 @@ message Source {
   }
 }
 
+// Protocol used to update repositories.
+enum RemoteProtocol {
+  // HTTPS.
+  DEFAULT_REMOTE_PROTOCOL = 0;
+  // SSH.
+  SSH_REMOTE_PROTOCOL = 1;
+}
+
 message UrlSource {
   // The URL to clone the repository from.
   string url = 1;
@@ -67,13 +75,7 @@ message GithubTokenSource {
   // https://tldp.org/LDP/GNU-Linux-Tools-Summary/html/x11655.htm
   repeated string filters = 4;
 
-  // Protocol used to update repositories.
-  enum RemoteProtocol {
-    // HTTPS.
-    DEFAULT_REMOTE_PROTOCOL = 0;
-    // SSH.
-    SSH_REMOTE_PROTOCOL = 1;
-  }
+  // Protocol used to fetch repository contents.
   RemoteProtocol remote_protocol = 5;
 
   // Local repository path override template, relative to the root. The

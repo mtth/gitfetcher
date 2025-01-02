@@ -1,7 +1,6 @@
-package gitfetcher
+package source
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -11,39 +10,15 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v66/github"
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 )
 
-// Source captures information about a repository to be mirrored.
-type Source struct {
-	// Qualified repository name, typically $owner/$name. Non-empty.
-	FullName string
-	// URL used to fetch repository updates. Non-empty.
-	FetchURL string
-	// Optional human-readable description. May be empty.
-	Description string
-	// Default branch. May be empty.
-	DefaultBranch string
-	// Local relative path override. May be empty.
-	RelPath string
-	// Last time the remote repository was updated. Zero if unknown.
-	LastUpdatedAt time.Time
-	// Git flags used to fetch repository updates.
-	fetchFlags []string
-}
-
-// FullName derives a repo's full name.
-func FullName(u *url.URL) string {
-	return strings.TrimPrefix(strings.TrimSuffix(u.Path, ".git"), "/")
-}
-
-// LoadSources returns all sources for the provided configuration.
-func LoadSources(ctx context.Context, configs []*configpb.Source) ([]Source, error) {
-	slog.Debug("Gathering sources...")
+// Load returns all sources for the provided configuration.
+func Load(ctx context.Context, configs []*configpb.Source) ([]Source, error) {
+	slog.Debug("Loading sources...")
 
 	var builder sourcesBuilder
 	gatherer := &sourceGatherer{builder: &builder, githubClient: github.NewClient(nil)}
@@ -69,46 +44,6 @@ func LoadSources(ctx context.Context, configs []*configpb.Source) ([]Source, err
 	return srcs, nil
 }
 
-type sourcesBuilder []Source
-
-type sourceOptions struct {
-	defaultBranch, path string
-	fetchFlags          []string
-	remoteProtocol      configpb.GithubTokenSource_RemoteProtocol
-}
-
-func (b *sourcesBuilder) addStandardURLRepo(u *url.URL, opts sourceOptions) {
-	*b = append(*b, Source{
-		FullName:      FullName(u),
-		FetchURL:      u.String(),
-		DefaultBranch: opts.defaultBranch,
-		RelPath:       opts.path,
-		fetchFlags:    opts.fetchFlags,
-	})
-}
-
-func (b *sourcesBuilder) addGithubRepo(repo *github.Repository, opts sourceOptions) {
-	src := Source{
-		FullName:      repo.GetFullName(),
-		Description:   repo.GetDescription(),
-		DefaultBranch: cmp.Or(opts.defaultBranch, repo.GetDefaultBranch()),
-		LastUpdatedAt: repo.GetUpdatedAt().Time,
-		RelPath:       opts.path,
-		fetchFlags:    opts.fetchFlags,
-	}
-	switch opts.remoteProtocol {
-	case configpb.GithubTokenSource_DEFAULT_REMOTE_PROTOCOL:
-		src.FetchURL = repo.GetCloneURL()
-	case configpb.GithubTokenSource_SSH_REMOTE_PROTOCOL:
-		src.FetchURL = repo.GetSSHURL()
-	}
-	*b = append(*b, src)
-}
-
-func (b *sourcesBuilder) build() []Source {
-	return ([]Source)(*b)
-}
-
 var (
 	errInvalidGithubToken = errors.New("invalid GitHub token")
 	errInvalidPath        = errors.New("invalid path")
@@ -116,7 +51,6 @@ var (
 	errInvalidURL         = errors.New("invalid URL")
 )
 
-// sourceGatherer is a GitHub-backed sourcesGatherer implementation.
 type sourceGatherer struct {
 	builder      *sourcesBuilder
 	githubClient *github.Client
@@ -136,7 +70,7 @@ func (c *sourceGatherer) gatherURLSource(
 	}
 	switch repoURL.Hostname() {
 	case "github.com":
-		folder, name := path.Split(FullName(repoURL))
+		folder, name := path.Split(fullNameFromURL(repoURL))
 		repo, _, err := c.githubClient.Repositories.Get(ctx, strings.TrimSuffix(folder, "/"), name)
 		if err != nil {
 			return fmt.Errorf("unable to get source from URL %v: %w", repoURL, err)
@@ -145,7 +79,7 @@ func (c *sourceGatherer) gatherURLSource(
 	default:
 		c.builder.addStandardURLRepo(repoURL, opts)
 	}
-	slog.Debug("Added URL source.", dataAttrs(slog.String("url", repoURL.String())))
+	slog.Debug("Added URL source.", slog.String("url", repoURL.String()))
 	return nil
 }
 
@@ -179,7 +113,9 @@ func (c *sourceGatherer) gatherGithubTokenSources(
 			return fmt.Errorf("%w: %w", errInvalidGithubToken, err)
 		}
 		for _, repo := range repos {
-			if (repo.GetFork() && !cfg.GetIncludeForks()) || (repo.GetArchived() && !cfg.GetIncludeArchived()) || !pred.accept(repo.GetFullName()) {
+			if (repo.GetFork() && !cfg.GetIncludeForks()) ||
+				(repo.GetArchived() && !cfg.GetIncludeArchived()) ||
+				!pred.accept(repo.GetFullName()) {
 				skipped++
 				continue
 			}
@@ -201,10 +137,7 @@ func (c *sourceGatherer) gatherGithubTokenSources(
 		}
 		opts.Page = res.NextPage
 	}
-	slog.Debug(
-		"Added authenticated source.",
-		dataAttrs(slog.Int("added", added), slog.Int("skipped", skipped)),
-	)
+	slog.Debug("Added authenticated source.", slog.Int("added", added), slog.Int("skipped", skipped))
 	return nil
 }
 
