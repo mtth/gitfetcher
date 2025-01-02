@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mtth/gitfetcher/internal/except"
@@ -15,8 +16,9 @@ import (
 const (
 	// DefaultRemote is the name of the remote used for sources.
 	DefaultRemote = "origin"
-	// gitDirName is the name of the gitdir folder inside a repo's workdir.
-	gitDirName = ".git"
+
+	// GitDirName is the name of the gitdir folder inside a repo's workdir.
+	GitDirName = ".git"
 )
 
 // Target is a local copy of a repository (mirror target).
@@ -34,15 +36,18 @@ func IsBare(tgt Target) bool {
 	return tgt.WorkDir() == ""
 }
 
+// realTarget is a filesystem-backed Target implementation.
 type realTarget struct {
 	gitDir, workDir fspath.Local
 }
 
+// GitDir implements Target.
 func (t realTarget) GitDir() fspath.Local { return t.gitDir }
 
+// WorkDir implements Target.
 func (t realTarget) WorkDir() fspath.Local { return t.workDir }
 
-// LastUpdatedAt is the most recent time at which a remote reference was updated. May be zero.
+// LastUpdatedAt implements Target.
 func (t realTarget) RemoteLastUpdatedAt() time.Time {
 	var maxTime time.Time
 	for _, remoteTime := range remoteRefUpdateTimes(t.gitDir) {
@@ -51,6 +56,12 @@ func (t realTarget) RemoteLastUpdatedAt() time.Time {
 		}
 	}
 	return maxTime
+}
+
+func unabs(fpath fspath.Local) fspath.POSIX {
+	absPath, err := filepath.Abs(fpath)
+	except.Must(err == nil, "can't make path %v absolute: %v", fpath, err)
+	return filepath.ToSlash(strings.TrimPrefix(absPath, string(filepath.Separator)))
 }
 
 // remoteRefUpdateTimes returns information about the repository's remote git references from a
@@ -66,7 +77,7 @@ func remoteRefUpdateTimes(fpath fspath.Local) map[string]time.Time {
 			if info, err := entry.Info(); err != nil {
 				slog.Warn("Ref info error, skipping.", except.LogErrAttr(err))
 			} else {
-				rel, err := filepath.Rel(root, filepath.FromSlash(fpath))
+				rel, err := filepath.Rel(root, filepath.FromSlash("/"+fpath))
 				if err != nil {
 					return err
 				}
@@ -92,7 +103,7 @@ func FromPath(dpath fspath.Local) (Target, error) {
 		gitdir = dpath
 	} else {
 		workdir = dpath
-		gitdir = filepath.Join(dpath, gitDirName)
+		gitdir = filepath.Join(dpath, GitDirName)
 		ok, err := isGitDir(gitdir)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {

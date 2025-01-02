@@ -28,6 +28,9 @@ var (
 	errMissingConfig = errors.New("configuration not found")
 )
 
+// FindConfig locates the first configuration file named .gitfetcher.conf starting from dpath and
+// going up the filesystem hierarchy. If no such file is found, a default configuration is returned
+// with root set to dpath.
 func FindConfig(dpath fspath.Local) (*configpb.Config, error) {
 	slog.Debug("Finding config...", slog.String("from", dpath))
 	child := dpath
@@ -53,6 +56,7 @@ func FindConfig(dpath fspath.Local) (*configpb.Config, error) {
 	}
 }
 
+// ReadConfig parses a configuration file from fpath.
 func ReadConfig(fpath fspath.Local) (*configpb.Config, error) {
 	slog.Debug("Reading config...", slog.String("path", fpath))
 	cfg, err := readConfig(fpath)

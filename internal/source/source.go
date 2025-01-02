@@ -11,18 +11,6 @@ import (
 	"github.com/mtth/gitfetcher/internal/fspath"
 )
 
-// Concepts:
-//
-// * Config source => SourceConfig
-// * Local repository => Target
-// * Source metadata => Source
-//
-// Operations:
-//
-// * Compare repo with source
-// * Fetch source metadata (batch)
-// * Update repo
-
 // Source captures information about a repository to be mirrored.
 type Source struct {
 	// Qualified repository name, typically $owner/$name. Non-empty.

@@ -57,7 +57,7 @@ func GatherSyncables(
 			if initLayout == configpb.Options_BARE_LAYOUT {
 				fp += ".git"
 			} else {
-				fp = path.Join(fp, ".git")
+				fp = path.Join(fp, target.GitDirName)
 			}
 		}
 		fp = path.Join(root, fp)

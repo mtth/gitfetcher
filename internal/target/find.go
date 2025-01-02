@@ -6,16 +6,10 @@ import (
 	"io/fs"
 	"log/slog"
 	"path"
-	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/mtth/gitfetcher/internal/fspath"
 )
-
-func unabs(fpath fspath.Local) fspath.POSIX {
-	return filepath.ToSlash(strings.TrimPrefix(fpath, string(filepath.Separator)))
-}
 
 var (
 	// maxDepth is the maximum filesystem depth explored when searching for targets in FindTargets.
@@ -33,6 +27,8 @@ var (
 func Find(root fspath.Local) ([]Target, error) {
 	slog.Debug("Finding targets", slog.String("root", root))
 
+	// root, err := filepath.Abs(root)
+	// except.Must(err == nil, "can't determine absolute root: %v", err)
 	depths := make(map[fspath.Local]uint8)
 	var targets []Target
 	// TODO: fs.WalkDir behaves strangely with absolute roots. Investigate if there is a cleaner way
@@ -48,7 +44,7 @@ func Find(root fspath.Local) ([]Target, error) {
 		if depth > maxDepth || slices.Contains(ignoredFolders, entry.Name()) {
 			return fs.SkipDir
 		}
-		tgt, err := FromPath(fpath)
+		tgt, err := FromPath("/" + fpath)
 		if err != nil {
 			return err
 		}

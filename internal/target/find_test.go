@@ -20,7 +20,7 @@ func bare(dpath fspath.Local) Target {
 }
 
 func nonBare(dpath fspath.Local) Target {
-	return realTarget{gitDir: filepath.Join(dpath, gitDirName), workDir: dpath}
+	return realTarget{gitDir: filepath.Join(dpath, GitDirName), workDir: dpath}
 }
 
 func TestFind(t *testing.T) {
@@ -31,9 +31,9 @@ func TestFind(t *testing.T) {
 			"root/first/.git/refs":    emptyFile,
 			"root/other":              emptyFile,
 		})()
-		targets, err := Find("root")
+		targets, err := Find("/root")
 		require.NoError(t, err)
-		assert.Equal(t, []Target{nonBare("root/first")}, targets)
+		assert.Equal(t, []Target{nonBare("/root/first")}, targets)
 	})
 
 	t.Run("ignores folders", func(t *testing.T) {
@@ -56,9 +56,9 @@ func TestFind(t *testing.T) {
 			"root/parent/vendor/child/.git/objects": emptyFile,
 			"root/parent/vendor/child/.git/refs":    emptyFile,
 		})()
-		targets, err := Find("root")
+		targets, err := Find("/root")
 		require.NoError(t, err)
-		assert.Equal(t, []Target{nonBare("root/parent")}, targets)
+		assert.Equal(t, []Target{nonBare("/root/parent")}, targets)
 	})
 
 	t.Run("multiple bare repositories", func(t *testing.T) {
@@ -70,9 +70,9 @@ func TestFind(t *testing.T) {
 			"root/two.git/objects": emptyFile,
 			"root/two.git/refs":    emptyFile,
 		})()
-		targets, err := Find("root")
+		targets, err := Find("/root")
 		require.NoError(t, err)
-		assert.Equal(t, []Target{bare("root/one.git"), bare("root/two.git")}, targets)
+		assert.Equal(t, []Target{bare("/root/one.git"), bare("/root/two.git")}, targets)
 	})
 }
 
@@ -89,7 +89,7 @@ func TestRemoteRefUpdateTimes(t *testing.T) {
 			"root/one.git/refs/remotes/origin/foo/two": &fstest.MapFile{ModTime: t3},
 			"root/one.git/refs/remotes/other/bar":      &fstest.MapFile{ModTime: t2},
 		})()
-		times := remoteRefUpdateTimes("root/one.git")
+		times := remoteRefUpdateTimes("/root/one.git")
 		assert.Equal(t, map[string]time.Time{"main": t1, "foo/one": t2, "foo/two": t3}, times)
 	})
 }
