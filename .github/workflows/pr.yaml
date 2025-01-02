@@ -34,7 +34,7 @@ jobs:
           lint: false
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Test
-        run: >
+        run: >-
           go test ./...
             -tags test
             -coverpkg=github.com/mtth/gitfetcher/internal/...
