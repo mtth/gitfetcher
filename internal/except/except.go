@@ -5,14 +5,11 @@ import (
 	"log/slog"
 )
 
+// Must panics if the input predicate is false.
 func Must(pred bool, msg string, args ...any) {
 	if !pred {
 		panic(fmt.Sprintf(msg, args...))
 	}
-}
-
-func Require(err error) {
-	Must(err == nil, "unexpected error: %v", err)
 }
 
 const logErrKey = "err"
