@@ -54,8 +54,8 @@ func main() {
 		Use:   "sync",
 		Short: "Sync repositories",
 		Args:  cobra.MaximumNArgs(0),
-		RunE: func(_ *cobra.Command, args []string) error {
-			syncables, err := gatherSyncables(ctx, args)
+		RunE: func(_ *cobra.Command, _ []string) error {
+			syncables, err := gatherSyncables(ctx)
 			if err != nil {
 				return err
 			}
@@ -72,8 +72,8 @@ func main() {
 		Use:   "status",
 		Short: "Show repository statuses",
 		Args:  cobra.MaximumNArgs(0),
-		RunE: func(_ *cobra.Command, args []string) error {
-			syncables, err := gatherSyncables(ctx, args)
+		RunE: func(_ *cobra.Command, _ []string) error {
+			syncables, err := gatherSyncables(ctx)
 			if err != nil {
 				return err
 			}
@@ -96,7 +96,7 @@ func main() {
 	}
 }
 
-func gatherSyncables(ctx context.Context, args []string) ([]gitfetcher.Syncable, error) {
+func gatherSyncables(ctx context.Context) ([]gitfetcher.Syncable, error) {
 	config, err := loadConfig()
 	if err != nil {
 		return nil, err

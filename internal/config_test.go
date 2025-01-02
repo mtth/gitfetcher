@@ -81,3 +81,17 @@ func TestReadConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestFindConfig(t *testing.T) {
+	t.Run("implicit", func(t *testing.T) {
+		got, err := FindConfig(".")
+		require.NoError(t, err)
+		assert.NotEmpty(t, got.GetOptions().GetRoot())
+	})
+
+	t.Run("explicit", func(t *testing.T) {
+		got, err := FindConfig("testdata")
+		require.NoError(t, err)
+		assert.Len(t, got.GetSources(), 2)
+	})
+}
