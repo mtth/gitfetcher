@@ -22,8 +22,8 @@ var (
 	errTargetSearchFailed = errors.New("unable to find targets")
 )
 
-// FindTargets walks the filesystem to find all repository targets under the root. Nested git
-// directories are ignored. The root directory is never considered a valid repository.
+// Find walks the filesystem to find all repository targets under the root. Nested git directories
+// are ignored. The root directory is never considered a valid repository.
 func Find(root fspath.Local) ([]Target, error) {
 	slog.Debug("Finding targets", slog.String("root", root))
 

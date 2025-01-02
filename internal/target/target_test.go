@@ -1,7 +1,6 @@
 package target
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/mtth/gitfetcher/internal/fspath"
@@ -25,7 +24,6 @@ func TestFromPath(t *testing.T) {
 		got, err := FromPath(fspath.ProjectRoot())
 		require.NoError(t, err)
 		assert.NotNil(t, got)
-		fmt.Println(got)
 		assert.False(t, got.RemoteLastUpdatedAt().IsZero())
 	})
 }

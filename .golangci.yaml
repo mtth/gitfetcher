@@ -1,4 +1,6 @@
 linters-settings:
+  dogsled:
+    max-blank-identifiers: 3
   errcheck:
     check-type-assertions: true
   govet:

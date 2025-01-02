@@ -1,3 +1,4 @@
+// Package target provides a representation of local repositories, i.e. mirror targets.
 package target
 
 import (
