@@ -2,18 +2,19 @@ package gitfetcher
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
-	"github.com/mtth/gitfetcher/internal/effect"
+	"github.com/mtth/gitfetcher/internal/fspath"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
 )
 
 func TestReadConfig(t *testing.T) {
-	defer effect.Swap(&filepathAbs, func(p string) (string, error) { return "/root/" + p, nil })()
+	testdataPath := filepath.Join(fspath.ProjectRoot(), "internal", "testdata")
 
 	for _, tc := range []struct {
 		path string
@@ -22,7 +23,6 @@ func TestReadConfig(t *testing.T) {
 		{
 			path: "testdata/.gitfetcher.conf",
 			want: &configpb.Config{
-				Options: &configpb.Options{Root: "/root/testdata/projects"},
 				Sources: []*configpb.Source{{
 					Branch: &configpb.Source_FromUrl{
 						FromUrl: &configpb.UrlSource{
@@ -36,10 +36,11 @@ func TestReadConfig(t *testing.T) {
 						},
 					},
 				}},
+				Options: &configpb.Options{Root: filepath.ToSlash(filepath.Join(testdataPath, "projects"))},
 			},
 		},
 		{
-			path: "testdata/.gitfetcher.great.conf",
+			path: filepath.Join(testdataPath, ".gitfetcher.great.conf"),
 			want: &configpb.Config{
 				Sources: []*configpb.Source{{
 					Branch: &configpb.Source_FromGithubToken{
@@ -50,7 +51,7 @@ func TestReadConfig(t *testing.T) {
 						},
 					},
 				}},
-				Options: &configpb.Options{Root: "/root/testdata"},
+				Options: &configpb.Options{Root: filepath.ToSlash(testdataPath)},
 			},
 		},
 	} {

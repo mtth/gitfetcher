@@ -23,6 +23,7 @@ import (
 
 var errDuplicateSource = errors.New("duplicate source path")
 
+// Reexports.
 var (
 	FindTargets = target.Find
 	LoadSources = source.Load

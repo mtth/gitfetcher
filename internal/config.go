@@ -60,9 +60,6 @@ func FindConfig(dpath fspath.Local) (*configpb.Config, error) {
 func ReadConfig(fpath fspath.Local) (*configpb.Config, error) {
 	slog.Debug("Reading config...", slog.String("path", fpath))
 	cfg, err := readConfig(fpath)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, errMissingConfig
-	}
 	if err != nil {
 		return nil, err
 	}
