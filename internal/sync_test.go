@@ -3,81 +3,115 @@ package gitfetcher
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
+	"github.com/mtth/gitfetcher/internal/effect"
+	"github.com/mtth/gitfetcher/internal/fspath"
+	"github.com/mtth/gitfetcher/internal/source"
+	"github.com/mtth/gitfetcher/internal/target"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestSync(t *testing.T) {
+func TestSyncable_Sync(t *testing.T) {
 	ctx := context.Background()
 	t0 := time.UnixMilli(3600_000)
 	t1 := time.UnixMilli(4800_000)
 
-	for key, tc := range map[string]func(*testing.T, map[string]time.Time, fmt.Stringer){
-		"no sources": func(t *testing.T, _ map[string]time.Time, _ fmt.Stringer) {
-			err := Sync(ctx, nil, &configpb.Options{Root: "/tmp"})
+	for key, tc := range map[string]func(*testing.T, fmt.Stringer){
+		"single bare missing source": func(t *testing.T, out fmt.Stringer) {
+			syncables, err := GatherSyncables(
+				nil,
+				[]source.Source{{
+					FullName:      "cool/test",
+					FetchURL:      "http://example.com/test",
+					DefaultBranch: "main",
+					LastUpdatedAt: t0,
+					RelPath:       "foo",
+				}},
+				"/tmp",
+				configpb.Options_BARE_LAYOUT,
+			)
 			require.NoError(t, err)
-		},
-		"single bare missing source": func(t *testing.T, _ map[string]time.Time, out fmt.Stringer) {
-			err := Sync(ctx, []*Source{{
-				FullName:      "cool/test",
-				FetchURL:      "http://example.com/test",
-				DefaultBranch: "main",
-				LastUpdatedAt: t0,
-				Path:          "foo",
-			}}, &configpb.Options{Root: "/tmp", Layout: configpb.Options_BARE_LAYOUT})
+			require.Len(t, syncables, 1)
+
+			err = syncables[0].Sync(ctx)
 			require.NoError(t, err)
 			assert.Equal(t, []string{
 				"init -b main --bare",
-				"remote add -m main origin http://example.com/test",
-				"fetch --all",
-				"update-ref refs/heads/HEAD refs/remotes/origin/main",
+				"remote add origin http://example.com/test",
 				"config set gitweb.url http://example.com/test",
 				"config set gitweb.extraBranchRefs remotes",
+				"fetch --all",
+				"update-ref refs/heads/HEAD refs/remotes/origin/main",
 			}, strings.Split(strings.TrimSpace(out.String()), "\n"))
 		},
-		"single missing source": func(t *testing.T, _ map[string]time.Time, out fmt.Stringer) {
-			err := Sync(ctx, []*Source{{
-				FullName:      "cool/test",
-				FetchURL:      "http://example.com/test",
-				DefaultBranch: "main",
-				LastUpdatedAt: t0,
-			}}, &configpb.Options{Root: "/tmp"})
+		"single missing source": func(t *testing.T, out fmt.Stringer) {
+			syncables, err := GatherSyncables(
+				nil,
+				[]source.Source{{
+					FullName:      "cool/test",
+					FetchURL:      "http://example.com/test",
+					DefaultBranch: "main",
+					LastUpdatedAt: t0,
+				}},
+				"/tmp",
+				configpb.Options_DEFAULT_LAYOUT,
+			)
+			require.NoError(t, err)
+			require.Len(t, syncables, 1)
+
+			err = syncables[0].Sync(ctx)
 			require.NoError(t, err)
 			assert.Equal(t, []string{
 				"init -b main",
-				"remote add -m main origin http://example.com/test",
-				"fetch --all",
-				"update-ref refs/remotes/origin/HEAD refs/remotes/origin/main",
-				"checkout main",
+				"remote add origin http://example.com/test",
 				"config set gitweb.url http://example.com/test",
 				"config set gitweb.extraBranchRefs remotes",
+				"fetch --all",
+				"checkout main",
 			}, strings.Split(strings.TrimSpace(out.String()), "\n"))
 		},
-		"stale and up-to-date sources": func(t *testing.T, times map[string]time.Time, out fmt.Stringer) {
-			times["/tmp/cool/stale.git"] = t0
-			times["/tmp/cool/up-to-date.git"] = t0
-			err := Sync(ctx, []*Source{{
-				FullName:      "cool/stale",
-				FetchURL:      "http://example.com/stale",
-				DefaultBranch: "main",
-				LastUpdatedAt: t1,
-			}, {
-				FullName:      "cool/up-to-date",
-				FetchURL:      "http://example.com/up-to-date",
-				DefaultBranch: "main",
-				LastUpdatedAt: t0,
-			}}, &configpb.Options{Root: "/tmp", Layout: configpb.Options_BARE_LAYOUT})
+		"stale and up-to-date sources": func(t *testing.T, out fmt.Stringer) {
+			syncables, err := GatherSyncables(
+				[]target.Target{fakeTarget{
+					path:                "/tmp/cool/stale",
+					remoteLastUpdatedAt: t0,
+				}, fakeTarget{
+					path:                "/tmp/cool/up-to-date",
+					remoteLastUpdatedAt: t0,
+				}},
+				[]source.Source{{
+					FullName:      "cool/stale",
+					FetchURL:      "http://example.com/stale",
+					DefaultBranch: "main",
+					LastUpdatedAt: t1,
+				}, {
+					FullName:      "cool/up-to-date",
+					FetchURL:      "http://example.com/up-to-date",
+					DefaultBranch: "main",
+					LastUpdatedAt: t0,
+				}},
+				"/tmp",
+				configpb.Options_DEFAULT_LAYOUT,
+			)
 			require.NoError(t, err)
+			require.Len(t, syncables, 2)
+
+			err = syncables[0].Sync(ctx)
+			require.NoError(t, err)
+			err = syncables[1].Sync(ctx)
+			require.NoError(t, err)
+
 			assert.Equal(t, []string{
-				"fetch --all",
-				"update-ref refs/heads/HEAD refs/remotes/origin/main",
 				"config set gitweb.url http://example.com/stale",
 				"config set gitweb.extraBranchRefs remotes",
+				"fetch --all",
+				"checkout main",
 				"config set gitweb.url http://example.com/up-to-date",
 				"config set gitweb.extraBranchRefs remotes",
 			}, strings.Split(strings.TrimSpace(out.String()), "\n"))
@@ -85,50 +119,27 @@ func TestSync(t *testing.T) {
 	} {
 		t.Run(key, func(t *testing.T) {
 			var b strings.Builder
-			defer swap(&runGitCommand, func(ctx context.Context, cwd string, args []string) {
+			defer effect.Swap(&runGitCommand, func(ctx context.Context, cwd string, args []string) {
 				b.WriteString(strings.Join(args, " "))
 				b.WriteString("\n")
 			})()
-
-			ts := make(map[string]time.Time)
-			defer swap(&targetModTime, func(t *target) time.Time {
-				return ts[t.folder]
-			})()
-
-			tc(t, ts, &b)
+			tc(t, &b)
 		})
 	}
 }
 
 func TestGetSyncStatus(t *testing.T) {
-	t0 := time.UnixMilli(3600_000)
-
 	t.Run("missing source", func(t *testing.T) {
-		got := GetSyncStatus(&Source{
-			FullName:      "cool/test",
-			FetchURL:      "http://example.com/test",
-			DefaultBranch: "main",
-			LastUpdatedAt: t0,
-		}, &configpb.Options{Root: "/tmp"})
-		assert.Equal(t, SyncStatusAbsent, got)
+		syncable := Syncable{
+			source: &source.Source{
+				FullName:      "cool/test",
+				FetchURL:      "http://example.com/up-to-date",
+				DefaultBranch: "main",
+			},
+		}
+		got := syncable.SyncStatus()
+		assert.Equal(t, SyncStatusMissing, got)
 	})
-}
-
-func TestFileModTime(t *testing.T) {
-	t.Run("missing", func(t *testing.T) {
-		got := fileModTime("./non/existent")
-		assert.True(t, got.IsZero())
-	})
-
-	t.Run("directory", func(t *testing.T) {
-		got := fileModTime(".")
-		assert.False(t, got.IsZero())
-	})
-}
-
-func TestTargetModTime(t *testing.T) {
-	got := targetModTime(&target{folder: "./missing"})
-	assert.True(t, got.IsZero())
 }
 
 func TestRunCommand(t *testing.T) {
@@ -151,3 +162,31 @@ func TestRunGitCommand(t *testing.T) {
 	ctx := context.Background()
 	require.NotPanics(t, func() { runGitCommand(ctx, ".", []string{"status"}) })
 }
+
+/*
+func TestSyncable_RootDir(t *testing.T) {
+	for key, tc := range map[string]struct {
+		syncable Syncable
+		want     string
+	}{
+		"bare target": {
+			syncable: Syncable{
+				target: &Target{Path: "/foo/bar/.git", IsBare: false},
+			},
+		},
+	} {
+		t.Run(key, func(t *testing.T) {
+
+		})
+	}
+}
+*/
+
+type fakeTarget struct {
+	path                fspath.Local
+	remoteLastUpdatedAt time.Time
+}
+
+func (t fakeTarget) GitDir() fspath.Local           { return filepath.Join(t.WorkDir(), ".git") }
+func (t fakeTarget) WorkDir() fspath.Local          { return filepath.FromSlash(t.path) }
+func (t fakeTarget) RemoteLastUpdatedAt() time.Time { return t.remoteLastUpdatedAt }

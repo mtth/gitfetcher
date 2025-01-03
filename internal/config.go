@@ -9,9 +9,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
+	"github.com/mtth/gitfetcher/internal/except"
+	"github.com/mtth/gitfetcher/internal/fspath"
 	"google.golang.org/protobuf/encoding/prototext"
 )
 
@@ -21,24 +24,53 @@ type Config = configpb.Config
 const defaultName = ".gitfetcher.conf"
 
 var (
-	errMissingConfig = errors.New("missing configuration")
 	errInvalidConfig = errors.New("invalid configuration")
+	errMissingConfig = errors.New("configuration not found")
 )
 
-// ParseConfig returns a parsed configuration from a given path. The path may either point to a
-// configuration file or a folder, in which case the default configuration file name will be used.
-// The configuration's root will be automatically populated.
-func ParseConfig(fp string) (*configpb.Config, error) {
-	slog.Debug("Reading config...", dataAttrs(slog.String("path", fp)))
+// FindConfig locates the first configuration file named .gitfetcher.conf starting from dpath and
+// going up the filesystem hierarchy. If no such file is found, a default configuration is returned
+// with root set to dpath.
+func FindConfig(dpath fspath.Local) (*configpb.Config, error) {
+	slog.Debug("Finding config...", slog.String("from", dpath))
+	child := dpath
+	for {
+		info, err := os.Stat(child)
+		except.Must(err == nil, "unable to read path %s: %v", child, err)
+		except.Must(info.IsDir(), "expected %s to be a directory", child)
+		fpath := filepath.Join(child, defaultName)
+		cfg, err := readConfig(fpath)
+		if err == nil {
+			slog.Info("Found config.", slog.String("from", child), slog.String("path", child))
+			return cfg, nil
+		}
+		except.Must(errors.Is(err, errMissingConfig), "error reading config: %v", err)
+		parent := filepath.Dir(child)
+		if parent == child {
+			slog.Info("No config found.", slog.String("from", child))
+			var cfg configpb.Config
+			ensureRootAbsolute(&cfg, dpath)
+			return &cfg, nil
+		}
+		child = parent
+	}
+}
 
-	info, err := os.Stat(fp)
+// ReadConfig parses a configuration file from fpath.
+func ReadConfig(fpath fspath.Local) (*configpb.Config, error) {
+	slog.Debug("Reading config...", slog.String("path", fpath))
+	cfg, err := readConfig(fpath)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errMissingConfig, err)
+		return nil, err
 	}
-	if info.IsDir() {
-		fp = filepath.Join(fp, defaultName)
-	}
-	data, err := os.ReadFile(fp)
+	slog.Info("Read config.", slog.String("path", fpath))
+	return cfg, nil
+}
+
+var filepathAbs = filepath.Abs
+
+func readConfig(fpath fspath.Local) (*configpb.Config, error) {
+	data, err := os.ReadFile(fpath)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", errMissingConfig, err)
 	}
@@ -46,18 +78,19 @@ func ParseConfig(fp string) (*configpb.Config, error) {
 	if err := prototext.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("%w: %v", errInvalidConfig, err)
 	}
-	if len(cfg.GetSources()) == 0 {
-		return nil, fmt.Errorf("%w: empty contents", errInvalidConfig)
-	}
-
-	root := cfg.GetOptions().GetRoot()
-	if !filepath.IsAbs(root) {
-		if cfg.GetOptions() == nil {
-			cfg.Options = &configpb.Options{}
-		}
-		cfg.Options.Root = filepath.Join(filepath.Dir(fp), root)
-	}
-
-	slog.Info("Read config.", dataAttrs(slog.String("path", fp), slog.String("root", root)))
+	ensureRootAbsolute(&cfg, filepath.Dir(fpath))
 	return &cfg, nil
+}
+
+func ensureRootAbsolute(cfg *configpb.Config, dpath fspath.Local) {
+	root := cfg.GetOptions().GetRoot()
+	if filepath.IsAbs(root) {
+		return
+	}
+	if cfg.GetOptions() == nil {
+		cfg.Options = &configpb.Options{}
+	}
+	base, err := filepathAbs(dpath)
+	except.Must(err == nil, "can't make path %v absolute: %v", dpath, err)
+	cfg.Options.Root = path.Join(filepath.ToSlash(base), root)
 }

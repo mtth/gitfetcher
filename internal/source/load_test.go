@@ -1,4 +1,4 @@
-package gitfetcher
+package source
 
 import (
 	"context"
@@ -11,20 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFindSources_StandardURL(t *testing.T) {
+func TestLoadSources_StandardURL(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("single named repo", func(t *testing.T) {
-		srcs, err := FindSources(ctx, &configpb.Config{
-			Sources: []*configpb.Source{{
-				Branch: &configpb.Source_FromUrl{
-					FromUrl: &configpb.UrlSource{
-						Url:           "https://gitlab.archlinux.org/archlinux/devtools.git",
-						DefaultBranch: "master",
-					},
+		srcs, err := Load(ctx, []*configpb.Source{{
+			Branch: &configpb.Source_FromUrl{
+				FromUrl: &configpb.UrlSource{
+					Url:           "https://gitlab.archlinux.org/archlinux/devtools.git",
+					DefaultBranch: "master",
 				},
-			}},
-		})
+			},
+		}})
 		require.NoError(t, err)
 		assert.Len(t, srcs, 1)
 		assert.Equal(t, "archlinux/devtools", srcs[0].FullName)
@@ -32,33 +30,29 @@ func TestFindSources_StandardURL(t *testing.T) {
 	})
 
 	t.Run("invalid URL", func(t *testing.T) {
-		srcs, err := FindSources(ctx, &configpb.Config{
-			Sources: []*configpb.Source{{
-				Branch: &configpb.Source_FromUrl{
-					FromUrl: &configpb.UrlSource{
-						Url: "https://example.com/unsupported/nested/repo.git",
-					},
+		srcs, err := Load(ctx, []*configpb.Source{{
+			Branch: &configpb.Source_FromUrl{
+				FromUrl: &configpb.UrlSource{
+					Url: "::/invalid.git",
 				},
-			}},
-		})
+			},
+		}})
 		assert.Nil(t, srcs)
-		assert.ErrorIs(t, err, errUnsupportedURL)
+		assert.ErrorIs(t, err, errInvalidURL)
 	})
 }
 
-func TestFindSources_Github(t *testing.T) {
+func TestLoadSources_Github(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("single named repo", func(t *testing.T) {
-		srcs, err := FindSources(ctx, &configpb.Config{
-			Sources: []*configpb.Source{{
-				Branch: &configpb.Source_FromUrl{
-					FromUrl: &configpb.UrlSource{
-						Url: "https://github.com/mtth/gitfetcher",
-					},
+		srcs, err := Load(ctx, []*configpb.Source{{
+			Branch: &configpb.Source_FromUrl{
+				FromUrl: &configpb.UrlSource{
+					Url: "https://github.com/mtth/gitfetcher",
 				},
-			}},
-		})
+			},
+		}})
 		require.NoError(t, err)
 		assert.Len(t, srcs, 1)
 		assert.Equal(t, "mtth/gitfetcher", srcs[0].FullName)
@@ -66,15 +60,13 @@ func TestFindSources_Github(t *testing.T) {
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
-		srcs, err := FindSources(ctx, &configpb.Config{
-			Sources: []*configpb.Source{{
-				Branch: &configpb.Source_FromGithubToken{
-					FromGithubToken: &configpb.GithubTokenSource{
-						Token: "abc",
-					},
+		srcs, err := Load(ctx, []*configpb.Source{{
+			Branch: &configpb.Source_FromGithubToken{
+				FromGithubToken: &configpb.GithubTokenSource{
+					Token: "abc",
 				},
-			}},
-		})
+			},
+		}})
 		assert.Nil(t, srcs)
 		assert.ErrorIs(t, err, errInvalidGithubToken)
 	})
@@ -84,16 +76,14 @@ func TestFindSources_Github(t *testing.T) {
 			t.SkipNow()
 		}
 
-		srcs, err := FindSources(ctx, &configpb.Config{
-			Sources: []*configpb.Source{{
-				Branch: &configpb.Source_FromGithubToken{
-					FromGithubToken: &configpb.GithubTokenSource{
-						Token:          "$SOURCES_GITHUB_TOKEN",
-						RemoteProtocol: configpb.GithubTokenSource_SSH_REMOTE_PROTOCOL,
-					},
+		srcs, err := Load(ctx, []*configpb.Source{{
+			Branch: &configpb.Source_FromGithubToken{
+				FromGithubToken: &configpb.GithubTokenSource{
+					Token:          "$SOURCES_GITHUB_TOKEN",
+					RemoteProtocol: configpb.RemoteProtocol_SSH_REMOTE_PROTOCOL,
 				},
-			}},
-		})
+			},
+		}})
 		require.NoError(t, err)
 		assert.NotEmpty(t, srcs)
 	})
