@@ -65,6 +65,9 @@ func unabs(fpath fspath.Local) fspath.POSIX {
 	return filepath.ToSlash(strings.TrimPrefix(absPath, string(filepath.Separator)))
 }
 
+// fileSystem is swapped out for testing.
+var fileSystem = os.DirFS("/")
+
 // remoteRefUpdateTimes returns information about the repository's remote git references from a
 // gitdir path.
 func remoteRefUpdateTimes(fpath fspath.Local) map[string]time.Time {
@@ -118,9 +121,6 @@ func FromPath(dpath fspath.Local) (Target, error) {
 	}
 	return realTarget{gitDir: gitdir, workDir: workdir}, nil
 }
-
-// fileSystem is swapped out for testing.
-var fileSystem = os.DirFS("/")
 
 // isGitDir returns whether path is a valid git directory. The logic is a simplified version of the
 // flow in https://stackoverflow.com/a/65499840 and may lead to false positives.

@@ -24,6 +24,6 @@ func TestFromPath(t *testing.T) {
 		got, err := FromPath(fspath.ProjectRoot())
 		require.NoError(t, err)
 		assert.NotNil(t, got)
-		assert.False(t, got.RemoteLastUpdatedAt().IsZero())
+		assert.False(t, IsBare(got))
 	})
 }

@@ -1,3 +1,4 @@
+// Package fspath enables more explicit type signatures for filesystem paths.
 package fspath
 
 // Local is a machine-dependent path representation. It is the format expected by functions in the

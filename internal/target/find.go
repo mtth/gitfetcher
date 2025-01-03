@@ -27,8 +27,6 @@ var (
 func Find(root fspath.Local) ([]Target, error) {
 	slog.Debug("Finding targets", slog.String("root", root))
 
-	// root, err := filepath.Abs(root)
-	// except.Must(err == nil, "can't determine absolute root: %v", err)
 	depths := make(map[fspath.Local]uint8)
 	var targets []Target
 	// TODO: fs.WalkDir behaves strangely with absolute roots. Investigate if there is a cleaner way
