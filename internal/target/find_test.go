@@ -19,6 +19,15 @@ func nonBare(dpath fspath.Local) Target {
 }
 
 func TestFind(t *testing.T) {
+	t.Run("invalid folder", func(t *testing.T) {
+		defer swapFileSystem(fstest.MapFS{
+			"foo": emptyFile,
+		})()
+		targets, err := Find("/bar")
+		require.ErrorIs(t, err, errTargetSearchFailed)
+		assert.Empty(t, targets)
+	})
+
 	t.Run("single repo", func(t *testing.T) {
 		defer swapFileSystem(fstest.MapFS{
 			"root/first/.git/HEAD":    emptyFile,

@@ -2,6 +2,7 @@ package target
 
 import (
 	"io/fs"
+	"path/filepath"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -13,8 +14,10 @@ import (
 )
 
 func TestFromPath(t *testing.T) {
+	root := fspath.ProjectRoot()
+
 	t.Run("non-git dir", func(t *testing.T) {
-		got, err := FromPath(".")
+		got, err := FromPath(filepath.Join(root, "internal"))
 		require.NoError(t, err)
 		assert.Nil(t, got)
 	})
@@ -25,9 +28,11 @@ func TestFromPath(t *testing.T) {
 	})
 
 	t.Run("valid dir", func(t *testing.T) {
-		got, err := FromPath(fspath.ProjectRoot())
+		got, err := FromPath(root)
 		require.NoError(t, err)
 		assert.NotNil(t, got)
+		assert.Equal(t, filepath.Join(root, GitDirName), got.GitDir())
+		assert.Equal(t, root, got.WorkDir())
 		assert.False(t, IsBare(got))
 	})
 }

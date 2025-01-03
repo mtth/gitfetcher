@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path"
 	"slices"
+	"time"
 
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 	"github.com/mtth/gitfetcher/internal/fspath"
@@ -37,6 +38,15 @@ type Syncable struct {
 	source *source.Source
 	// True iff the repository should be created bare.
 	bareInit bool
+}
+
+// LastSyncedAt returns the time at which the repo's origin remote was last updated, or zero if the
+// repo does not exist locally.
+func (s *Syncable) LastSyncedAt() time.Time {
+	if tgt := s.target; tgt != nil {
+		return (*tgt).RemoteLastUpdatedAt()
+	}
+	return time.Time{}
 }
 
 // GatherSyncables reconciles targets and sources into Syncable instances.

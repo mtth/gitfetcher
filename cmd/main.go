@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/adrg/xdg"
+	humanize "github.com/dustin/go-humanize"
 	gitfetcher "github.com/mtth/gitfetcher/internal"
 	"github.com/mtth/gitfetcher/internal/except"
 	"github.com/spf13/cobra"
@@ -79,7 +80,7 @@ func main() {
 			}
 			for _, syncable := range syncables {
 				status := syncable.SyncStatus()
-				fmt.Printf("%v\t%s\n", status, syncable.RootDir()) //nolint:forbidigo
+				fmt.Printf("%v\t%s\t%s\n", status, syncable.RootDir(), humanize.Time(syncable.LastSyncedAt())) //nolint:forbidigo
 			}
 			return nil
 		},
