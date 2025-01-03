@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"slices"
 	"time"
 
@@ -200,20 +201,20 @@ func (s *Syncable) isBare() bool {
 	return s.bareInit
 }
 
-func (s *Syncable) gitPath(lp string) string {
-	return path.Join(s.GitDir, lp)
+func (s *Syncable) gitPath(lp fspath.POSIX) fspath.Local {
+	return filepath.Join(s.GitDir, filepath.FromSlash(lp))
 }
 
 // WorkDir returns the syncable's working directory, or an empty string if absent (for bare repos).
-func (s *Syncable) WorkDir() string {
+func (s *Syncable) WorkDir() fspath.Local {
 	if s.isBare() {
 		return ""
 	}
-	return path.Dir(s.GitDir)
+	return filepath.Dir(s.GitDir)
 }
 
 // RootDir returns the syncable's outermost directory (workdir if present, else gitdir).
-func (s *Syncable) RootDir() string {
+func (s *Syncable) RootDir() fspath.Local {
 	return cmp.Or(s.WorkDir(), s.GitDir)
 }
 
@@ -264,7 +265,7 @@ var (
 	}
 )
 
-func fileExists(fp string) bool {
+func fileExists(fp fspath.POSIX) bool {
 	_, err := os.Stat(fp)
 	return !errors.Is(err, fs.ErrNotExist)
 }
