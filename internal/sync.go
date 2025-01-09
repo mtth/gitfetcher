@@ -54,7 +54,7 @@ func (s *Syncable) LastSyncedAt() time.Time {
 // GatherSyncables reconciles targets and sources into Syncable instances.
 func GatherSyncables(
 	targets []target.Target,
-	sources []source.Source,
+	sources []*source.Source,
 	root string,
 	initLayout configpb.Options_Layout,
 ) ([]Syncable, error) {
@@ -76,7 +76,7 @@ func GatherSyncables(
 		if _, ok := sourcesByPath[fp]; ok {
 			return nil, fmt.Errorf("%w (%s)", errDuplicateSource, fp)
 		}
-		sourcesByPath[fp] = &source
+		sourcesByPath[fp] = source
 	}
 
 	// Then we iterate over targets to create syncables, adding a source if available.

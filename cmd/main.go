@@ -4,13 +4,11 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
 
 	"github.com/adrg/xdg"
-	humanize "github.com/dustin/go-humanize"
 	gitfetcher "github.com/mtth/gitfetcher/internal"
 	"github.com/mtth/gitfetcher/internal/except"
 	"github.com/spf13/cobra"
@@ -78,11 +76,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			for _, syncable := range syncables {
-				status := syncable.SyncStatus()
-				fmt.Printf("%v\t%s\t%s\n", status, syncable.RootDir(), humanize.Time(syncable.LastSyncedAt())) //nolint:forbidigo
-			}
-			return nil
+			return showTable(syncables)
 		},
 	}
 
@@ -107,7 +101,7 @@ func gatherSyncables(ctx context.Context) ([]gitfetcher.Syncable, error) {
 	if err != nil {
 		return nil, err
 	}
-	sources, err := gitfetcher.LoadSources(ctx, config.GetSources())
+	sources, err := gitfetcher.LoadSources(ctx, config.GetOrigins())
 	if err != nil {
 		return nil, err
 	}

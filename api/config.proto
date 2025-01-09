@@ -6,8 +6,8 @@ option go_package = "github.com/mtth/gitfetcher/configpb_gen;configpb";
 
 // Overall fetching configuration.
 message Config {
-  // All repository sources to fetch.
-  repeated Source sources = 1;
+  // All repository origins to fetch.
+  repeated Origin origins = 1;
 
   // Global options.
   Options options = 2;
@@ -30,10 +30,10 @@ message Options {
   Layout init_layout = 2;
 }
 
-message Source {
+message Origin {
   oneof branch {
-    UrlSource from_url = 1;
-    GithubTokenSource from_github_token = 2;
+    UrlOrigin from_url = 1;
+    GithubTokenOrigin from_github_token = 2;
   }
 }
 
@@ -45,7 +45,7 @@ enum RemoteProtocol {
   SSH_REMOTE_PROTOCOL = 1;
 }
 
-message UrlSource {
+message UrlOrigin {
   // The URL to clone the repository from.
   string url = 1;
 
@@ -59,7 +59,7 @@ message UrlSource {
   string path = 3;
 }
 
-message GithubTokenSource {
+message GithubTokenOrigin {
   // Authentication information used to fetch multiple repositories. This allows
   // fetching private repositories.
   string token = 1;

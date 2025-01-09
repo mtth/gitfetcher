@@ -26,7 +26,7 @@ func TestSyncable_Sync(t *testing.T) {
 		"single bare missing source": func(t *testing.T, out fmt.Stringer) {
 			syncables, err := GatherSyncables(
 				nil,
-				[]source.Source{{
+				[]*source.Source{{
 					FullName:      "cool/test",
 					FetchURL:      "http://example.com/test",
 					DefaultBranch: "main",
@@ -53,7 +53,7 @@ func TestSyncable_Sync(t *testing.T) {
 		"single missing source": func(t *testing.T, out fmt.Stringer) {
 			syncables, err := GatherSyncables(
 				nil,
-				[]source.Source{{
+				[]*source.Source{{
 					FullName:      "cool/test",
 					FetchURL:      "http://example.com/test",
 					DefaultBranch: "main",
@@ -85,7 +85,7 @@ func TestSyncable_Sync(t *testing.T) {
 					path:                "/tmp/cool/up-to-date",
 					remoteLastUpdatedAt: t0,
 				}},
-				[]source.Source{{
+				[]*source.Source{{
 					FullName:      "cool/stale",
 					FetchURL:      "http://example.com/stale",
 					DefaultBranch: "main",

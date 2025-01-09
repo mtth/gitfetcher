@@ -1,12 +1,11 @@
+// Package source loads remote information about repositories.
 package source
 
 import (
-	"cmp"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v66/github"
 	configpb "github.com/mtth/gitfetcher/internal/configpb_gen"
 	"github.com/mtth/gitfetcher/internal/fspath"
 )
@@ -29,45 +28,21 @@ type Source struct {
 	FetchFlags []string
 }
 
-type sourcesBuilder []Source
-
-type sourceOptions struct {
+type options struct {
 	defaultBranch  string
 	path           fspath.POSIX
 	fetchFlags     []string
 	remoteProtocol configpb.RemoteProtocol
 }
 
-func (b *sourcesBuilder) addStandardURLRepo(u *url.URL, opts sourceOptions) {
-	*b = append(*b, Source{
+func fromURL(u *url.URL, opts options) *Source {
+	return &Source{
 		FullName:      fullNameFromURL(u),
 		FetchURL:      u.String(),
 		DefaultBranch: opts.defaultBranch,
 		RelPath:       opts.path,
 		FetchFlags:    opts.fetchFlags,
-	})
-}
-
-func (b *sourcesBuilder) addGithubRepo(repo *github.Repository, opts sourceOptions) {
-	src := Source{
-		FullName:      repo.GetFullName(),
-		Description:   repo.GetDescription(),
-		DefaultBranch: cmp.Or(opts.defaultBranch, repo.GetDefaultBranch()),
-		LastUpdatedAt: repo.GetUpdatedAt().Time,
-		RelPath:       opts.path,
-		FetchFlags:    opts.fetchFlags,
 	}
-	switch opts.remoteProtocol {
-	case configpb.RemoteProtocol_DEFAULT_REMOTE_PROTOCOL:
-		src.FetchURL = repo.GetCloneURL()
-	case configpb.RemoteProtocol_SSH_REMOTE_PROTOCOL:
-		src.FetchURL = repo.GetSSHURL()
-	}
-	*b = append(*b, src)
-}
-
-func (b *sourcesBuilder) build() []Source {
-	return ([]Source)(*b)
 }
 
 func fullNameFromURL(u *url.URL) string {

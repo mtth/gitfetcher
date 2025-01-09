@@ -23,15 +23,15 @@ func TestReadConfig(t *testing.T) {
 		{
 			path: "testdata/.gitfetcher.conf",
 			want: &configpb.Config{
-				Sources: []*configpb.Source{{
-					Branch: &configpb.Source_FromUrl{
-						FromUrl: &configpb.UrlSource{
+				Origins: []*configpb.Origin{{
+					Branch: &configpb.Origin_FromUrl{
+						FromUrl: &configpb.UrlOrigin{
 							Url: "https://github.com/mtth/gitfetcher",
 						},
 					},
 				}, {
-					Branch: &configpb.Source_FromGithubToken{
-						FromGithubToken: &configpb.GithubTokenSource{
+					Branch: &configpb.Origin_FromGithubToken{
+						FromGithubToken: &configpb.GithubTokenOrigin{
 							Token: "$GITHUB_TOKEN",
 						},
 					},
@@ -42,9 +42,9 @@ func TestReadConfig(t *testing.T) {
 		{
 			path: filepath.Join(testdataPath, ".gitfetcher.great.conf"),
 			want: &configpb.Config{
-				Sources: []*configpb.Source{{
-					Branch: &configpb.Source_FromGithubToken{
-						FromGithubToken: &configpb.GithubTokenSource{
+				Origins: []*configpb.Origin{{
+					Branch: &configpb.Origin_FromGithubToken{
+						FromGithubToken: &configpb.GithubTokenOrigin{
 							Token:          "secret-token",
 							Filters:        []string{"foo/*"},
 							RemoteProtocol: configpb.RemoteProtocol_SSH_REMOTE_PROTOCOL,
@@ -94,6 +94,6 @@ func TestFindConfig(t *testing.T) {
 	t.Run("explicit", func(t *testing.T) {
 		got, err := FindConfig("testdata")
 		require.NoError(t, err)
-		assert.Len(t, got.GetSources(), 2)
+		assert.Len(t, got.GetOrigins(), 2)
 	})
 }
