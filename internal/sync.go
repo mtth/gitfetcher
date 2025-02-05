@@ -24,10 +24,16 @@ import (
 
 var errDuplicateSource = errors.New("duplicate source path")
 
-// Reexports.
+// Value reexports.
 var (
 	FindTargets = target.Find
 	LoadSources = source.Load
+)
+
+// Type reexports.
+type (
+	Source = source.Source
+	Target = target.Target
 )
 
 // Syncable contains all the information needed to mirror a repository.
@@ -35,7 +41,7 @@ type Syncable struct {
 	// Absolute local path to the repository's gitdir.
 	GitDir fspath.Local
 	// Local target, if any.
-	target *target.Target
+	target target.Target
 	// Mirror source, if any. Present if target is nil.
 	source *source.Source
 	// True iff the repository should be created bare.
@@ -46,7 +52,7 @@ type Syncable struct {
 // repo does not exist locally.
 func (s *Syncable) LastSyncedAt() time.Time {
 	if tgt := s.target; tgt != nil {
-		return (*tgt).RemoteLastUpdatedAt()
+		return tgt.RemoteLastUpdatedAt()
 	}
 	return time.Time{}
 }
@@ -56,21 +62,18 @@ func GatherSyncables(
 	targets []target.Target,
 	sources []*source.Source,
 	root string,
-	initLayout configpb.Options_Layout,
+	layout configpb.Options_Layout,
 ) ([]Syncable, error) {
 	slog.Debug("Gathering syncables...")
 
 	// We first index all sources by target path.
 	sourcesByPath := make(map[string]*source.Source)
 	for _, source := range sources {
-		fp := source.RelPath
-		if fp == "" {
-			fp = source.FullName
-			if initLayout == configpb.Options_BARE_LAYOUT {
-				fp += ".git"
-			} else {
-				fp = path.Join(fp, target.GitDirName)
-			}
+		fp := cmp.Or(source.RelPath, source.FullName)
+		if layout == configpb.Options_BARE_LAYOUT {
+			fp += ".git"
+		} else {
+			fp = path.Join(fp, target.GitDirName)
 		}
 		fp = path.Join(root, fp)
 		if _, ok := sourcesByPath[fp]; ok {
@@ -83,14 +86,15 @@ func GatherSyncables(
 	syncablesByPath := make(map[string]Syncable)
 	for _, target := range targets {
 		gitDir := target.GitDir()
-		syncable := Syncable{GitDir: gitDir, target: &target}
+		syncable := Syncable{GitDir: gitDir, target: target}
 		if source, ok := sourcesByPath[gitDir]; ok {
 			syncable.source = source
 		}
 		syncablesByPath[gitDir] = syncable
 	}
+
 	// Finally, we look for sources which do not yet have a target.
-	bareInit := initLayout == configpb.Options_BARE_LAYOUT
+	bareInit := layout == configpb.Options_BARE_LAYOUT
 	for fp, source := range sourcesByPath {
 		if _, ok := syncablesByPath[fp]; !ok {
 			syncablesByPath[fp] = Syncable{GitDir: fp, source: source, bareInit: bareInit}
@@ -110,7 +114,7 @@ func (s *Syncable) SyncStatus() SyncStatus {
 		return SyncStatusMissing
 	case s.source == nil || s.source.LastUpdatedAt.IsZero():
 		return SyncStatusUnknown
-	case (*s.target).RemoteLastUpdatedAt().Before(s.source.LastUpdatedAt):
+	case s.target.RemoteLastUpdatedAt().Before(s.source.LastUpdatedAt):
 		return SyncStatusStale
 	default:
 		return SyncStatusFresh
@@ -168,7 +172,8 @@ func (s *Syncable) Sync(ctx context.Context) (err error) {
 }
 
 func (s *Syncable) createTarget(ctx context.Context) {
-	checkSyncStep(os.MkdirAll(s.GitDir, 0755))
+	root := s.RootDir()
+	checkSyncStep(os.MkdirAll(root, 0755))
 
 	// We don't use git clone to avoid having the credentials saved in the repo's config and share
 	// more logic with the update function below.
@@ -179,24 +184,21 @@ func (s *Syncable) createTarget(ctx context.Context) {
 	if s.bareInit {
 		initArgs = append(initArgs, "--bare")
 	}
-	runGitCommand(ctx, s.GitDir, initArgs)
+	runGitCommand(ctx, root, initArgs)
 
 	// TODO: Confirm that we do not need -m to specify a branch when adding the remote.
-	runGitCommand(ctx, s.GitDir, []string{"remote", "add", target.DefaultRemote, s.source.FetchURL})
+	runGitCommand(ctx, root, []string{"remote", "add", target.DefaultRemote, s.source.FetchURL})
 
 	slog.Debug("Created target.")
 }
 
-func (s *Syncable) defaultRemoteRef() string {
-	if source := s.source; source != nil && source.DefaultBranch != "" {
-		return fmt.Sprintf("refs/remotes/%s/%s", target.DefaultRemote, source.DefaultBranch)
-	}
-	return ""
+func (s *Syncable) remoteRef(name string) string {
+	return fmt.Sprintf("refs/remotes/%s/%s", target.DefaultRemote, name)
 }
 
 func (s *Syncable) isBare() bool {
 	if tgt := s.target; tgt != nil {
-		return target.IsBare(*tgt)
+		return target.IsBare(tgt)
 	}
 	return s.bareInit
 }
@@ -221,27 +223,33 @@ func (s *Syncable) RootDir() fspath.Local {
 func (s *Syncable) updateContents(ctx context.Context) {
 	slog.Debug("Updating contents...")
 
-	fetchFlags := []string{"fetch", "--all"}
+	fetchFlags := []string{"fetch", target.DefaultRemote}
 	if src := s.source; src != nil {
-		fetchFlags = append(fetchFlags, src.FetchFlags...)
+		fetchFlags = append(src.FetchFlags, fetchFlags...)
 	}
 	runGitCommand(ctx, s.GitDir, fetchFlags)
 
 	if s.isBare() {
 		// Update HEAD directly so that gitweb shows the most recent remote commit.
-		if ref := s.defaultRemoteRef(); ref != "" {
+		if s.source != nil && s.source.DefaultBranch != "" {
+			ref := s.remoteRef(s.source.DefaultBranch)
 			runGitCommand(ctx, s.GitDir, []string{"update-ref", "refs/heads/HEAD", ref})
 		}
 	} else {
 		if !fileExists(s.gitPath("refs/heads/HEAD")) {
 			// No working directory yet.
 			if source := s.source; source != nil && source.DefaultBranch != "" {
-				runGitCommand(ctx, s.GitDir, []string{"checkout", source.DefaultBranch})
+				runGitCommand(ctx, s.WorkDir(), []string{"checkout", source.DefaultBranch})
 			}
 		} else {
-			runGitCommand(ctx, s.GitDir, []string{"merge", "--ff-only"})
+			runGitCommand(ctx, s.WorkDir(), []string{"merge", "--ff-only"})
 		}
 	}
+
+	// Touch the directory to record the time of this sync. It will get picked up by the target's
+	// RemoteLastUpdatedAt method.
+	runCommand(ctx, s.GitDir, "touch", []string{s.remoteRef("")})
+
 	slog.Debug("Updated contents.")
 }
 

@@ -33,7 +33,10 @@ var (
 // with root set to dpath.
 func FindConfig(dpath fspath.Local) (*configpb.Config, error) {
 	slog.Debug("Finding config...", slog.String("from", dpath))
-	child := dpath
+	child, err := filepath.Abs(dpath)
+	if err != nil {
+		return nil, err
+	}
 	for {
 		info, err := os.Stat(child)
 		except.Must(err == nil, "unable to read path %s: %v", child, err)

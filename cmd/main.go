@@ -43,7 +43,8 @@ func init() {
 }
 
 var (
-	configPath string
+	configPath  string
+	localStatus bool
 )
 
 func main() {
@@ -58,12 +59,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			for _, syncable := range syncables {
-				if err := syncable.Sync(ctx); err != nil {
-					return err
-				}
-			}
-			return nil
+			return runSync(ctx, syncables)
 		},
 	}
 
@@ -76,9 +72,10 @@ func main() {
 			if err != nil {
 				return err
 			}
-			return showTable(syncables)
+			return runStatus(syncables)
 		},
 	}
+	statusCmd.Flags().BoolVarP(&localStatus, "local", "l", false, "do not query source origins")
 
 	rootCmd := &cobra.Command{Use: "gitfetcher", SilenceUsage: true}
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
@@ -101,11 +98,14 @@ func gatherSyncables(ctx context.Context) ([]gitfetcher.Syncable, error) {
 	if err != nil {
 		return nil, err
 	}
-	sources, err := gitfetcher.LoadSources(ctx, config.GetOrigins())
-	if err != nil {
-		return nil, err
+	var sources []*gitfetcher.Source
+	if !localStatus {
+		sources, err = gitfetcher.LoadSources(ctx, config.GetOrigins())
+		if err != nil {
+			return nil, err
+		}
 	}
-	return gitfetcher.GatherSyncables(targets, sources, root, config.GetOptions().GetInitLayout())
+	return gitfetcher.GatherSyncables(targets, sources, root, config.GetOptions().GetLayout())
 }
 
 func loadConfig() (*gitfetcher.Config, error) {

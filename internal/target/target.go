@@ -50,8 +50,8 @@ func (t realTarget) WorkDir() fspath.Local { return t.workDir }
 
 // LastUpdatedAt implements Target.
 func (t realTarget) RemoteLastUpdatedAt() time.Time {
-	var maxTime time.Time
-	for _, remoteTime := range remoteRefUpdateTimes(t.gitDir) {
+	maxTime, refTimes := remoteRefUpdateTimes(t.gitDir)
+	for _, remoteTime := range refTimes {
 		if remoteTime.After(maxTime) {
 			maxTime = remoteTime
 		}
@@ -70,9 +70,13 @@ var fileSystem = os.DirFS("/")
 
 // remoteRefUpdateTimes returns information about the repository's remote git references from a
 // gitdir path.
-func remoteRefUpdateTimes(fpath fspath.Local) map[string]time.Time {
+func remoteRefUpdateTimes(fpath fspath.Local) (time.Time, map[string]time.Time) {
 	refs := make(map[fspath.Local]time.Time)
 	root := filepath.Join(fpath, "refs", "remotes", DefaultRemote)
+	info, err := os.Stat(root)
+	if err != nil {
+		slog.Warn("Failed to stats remote ref directory.", except.LogErrAttr(err))
+	}
 	if err := fs.WalkDir(fileSystem, unabs(root), func(fpath fspath.POSIX, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -92,7 +96,7 @@ func remoteRefUpdateTimes(fpath fspath.Local) map[string]time.Time {
 	}); err != nil {
 		slog.Warn("Failed to get remote refs.", except.LogErrAttr(err), slog.String("path", fpath))
 	}
-	return refs
+	return info.ModTime(), refs
 }
 
 // FromPath returns a Target from a local path if it contains a repository. Otherwise it returns a

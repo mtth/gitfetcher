@@ -25,7 +25,7 @@ var (
 // Find walks the filesystem to find all repository targets under the root. Nested git directories
 // are ignored. The root directory is never considered a valid repository.
 func Find(root fspath.Local) ([]Target, error) {
-	slog.Debug("Finding targets", slog.String("root", root))
+	slog.Debug("Finding targets...", slog.String("root", root))
 
 	depths := make(map[fspath.Local]uint8)
 	var targets []Target
@@ -47,6 +47,7 @@ func Find(root fspath.Local) ([]Target, error) {
 			return err
 		}
 		if tgt != nil {
+			slog.Debug("Found target.", slog.String("gitdir", tgt.GitDir()))
 			targets = append(targets, tgt)
 			return fs.SkipDir
 		}
