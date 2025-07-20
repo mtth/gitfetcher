@@ -1,0 +1,12 @@
+gitfetcher CLI API
+
+There are 2 modes of running:
+
+* As a mirror server: all repos will be mirrors. In this case, all
+  repositories should have core.bare = true and core.mirror = true. Each
+  fetch will overwrite any local refs.
+
+* In a normal dev environment, to update many repositories at once. In
+  this case the fetch will not touch the working directory.
+
+The default command should be fetch.
