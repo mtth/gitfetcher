@@ -20,12 +20,12 @@ import (
 )
 
 type githubClient interface {
-	urlSource(ctx context.Context, origin *configpb.UrlOrigin) (*Source, error)
-	tokenSources(ctx context.Context, origin *configpb.GithubTokenOrigin) ([]*Source, error)
+	urlSource(context.Context, *configpb.UrlOrigin) (*Source, error)
+	tokenSources(context.Context, *configpb.GithubTokenOrigin) ([]*Source, error)
 }
 
 func newRealGithubClient() githubClient {
-	return &realGithubClient{github.NewClient(nil)}
+	return realGithubClient{github.NewClient(nil)}
 }
 
 type realGithubClient struct {
@@ -36,7 +36,7 @@ var (
 	errInvalidGithubToken = errors.New("invalid GitHub token")
 )
 
-func (c *realGithubClient) urlSource(ctx context.Context, origin *configpb.UrlOrigin) (*Source, error) {
+func (c realGithubClient) urlSource(ctx context.Context, origin *configpb.UrlOrigin) (*Source, error) {
 	u, err := url.Parse(origin.GetUrl())
 	except.Must(err == nil, "invalid URL: %v", err)
 	opts := options{
@@ -51,7 +51,7 @@ func (c *realGithubClient) urlSource(ctx context.Context, origin *configpb.UrlOr
 	return fromGithubRepo(repo, opts), nil
 }
 
-func (c *realGithubClient) tokenSources(ctx context.Context, origin *configpb.GithubTokenOrigin) ([]*Source, error) {
+func (c realGithubClient) tokenSources(ctx context.Context, origin *configpb.GithubTokenOrigin) ([]*Source, error) {
 	token := origin.GetToken()
 	if suffix, ok := strings.CutPrefix(token, "$"); ok {
 		token = os.Getenv(suffix)
@@ -116,6 +116,7 @@ func fromGithubRepo(repo *github.Repository, opts options) *Source {
 		LastUpdatedAt: repo.GetUpdatedAt().Time,
 		RelPath:       opts.path,
 		FetchFlags:    opts.fetchFlags,
+		URLs:          distinctURLs(repo.GetCloneURL(), repo.GetGitURL(), repo.GetSSHURL()),
 	}
 	switch opts.remoteProtocol {
 	case configpb.RemoteProtocol_DEFAULT_REMOTE_PROTOCOL:

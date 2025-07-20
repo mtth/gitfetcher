@@ -13,35 +13,11 @@ message Config {
   Options options = 2;
 }
 
-message Options {
-  // Path to root folder, defaults to the configuration's enclosing directory.
-  string root = 1;
-
-  // Repository layout.
-  enum Layout {
-    // Default repository, including a worktree.
-    DEFAULT_LAYOUT = 0;
-    // Bare repository, without a worktree.
-    BARE_LAYOUT = 1;
-  }
-
-  // Repository layout used.
-  Layout layout = 2;
-}
-
 message Origin {
   oneof branch {
     UrlOrigin from_url = 1;
     GithubTokenOrigin from_github_token = 2;
   }
-}
-
-// Protocol used to update repositories.
-enum RemoteProtocol {
-  // HTTPS.
-  DEFAULT_REMOTE_PROTOCOL = 0;
-  // SSH.
-  SSH_REMOTE_PROTOCOL = 1;
 }
 
 message UrlOrigin {
@@ -82,4 +58,29 @@ message GithubTokenOrigin {
   // default is "{{ .FullName }}". Note that bare repositories will have `.git`
   // appended to the path.
   string path_template = 6;
+}
+
+// Protocol used to update repositories.
+enum RemoteProtocol {
+  // HTTPS.
+  DEFAULT_REMOTE_PROTOCOL = 0;
+  // SSH.
+  SSH_REMOTE_PROTOCOL = 1;
+}
+
+message Options {
+  // Path to root folder, defaults to the configuration's enclosing directory.
+  string root = 1;
+
+  // Repository layout.
+  enum Layout {
+    // Default repository, including a worktree.
+    DEFAULT_LAYOUT = 0;
+    // Bare repository, without a worktree.
+    BARE_LAYOUT = 1;
+  }
+
+  // Default repository layout used when initializing a local copy. This setting
+  // is ignored for repositories which have already been cloned.
+  Layout init_layout = 2;
 }

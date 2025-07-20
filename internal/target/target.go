@@ -22,34 +22,24 @@ const (
 	GitDirName = ".git"
 )
 
-// Target is a local copy of a repository (mirror target).
-type Target interface {
+// Target is a local copy of a repository.
+type Target struct {
 	// Path to local gitdir (not working tree).
-	GitDir() fspath.Local
+	GitDir fspath.Local
 	// WorkDir is the rep's working directory, or empty if the repo is bare.
-	WorkDir() fspath.Local
-	// LastUpdatedAt is the most recent time at which a remote reference was updated. May be zero.
-	RemoteLastUpdatedAt() time.Time
+	WorkDir fspath.Local
+	// LastUpdatedAt is the most recent time at which a remote reference was updated. May be zero if
+	// unknown.
+	RemoteLastUpdatedAt time.Time
 }
 
 // IsBare returns true iff the input target does not have a work directory.
-func IsBare(tgt Target) bool {
-	return tgt.WorkDir() == ""
+func (t *Target) IsBare() bool {
+	return t.WorkDir() == ""
 }
 
-// realTarget is a filesystem-backed Target implementation.
-type realTarget struct {
-	gitDir, workDir fspath.Local
-}
-
-// GitDir implements Target.
-func (t realTarget) GitDir() fspath.Local { return t.gitDir }
-
-// WorkDir implements Target.
-func (t realTarget) WorkDir() fspath.Local { return t.workDir }
-
-// LastUpdatedAt implements Target.
-func (t realTarget) RemoteLastUpdatedAt() time.Time {
+// RemoteLastUpdatedAt implements Target.
+func (t *Target) RemoteLastUpdatedAt() time.Time {
 	maxTime, refTimes := remoteRefUpdateTimes(t.gitDir)
 	for _, remoteTime := range refTimes {
 		if remoteTime.After(maxTime) {
@@ -67,6 +57,8 @@ func unabs(fpath fspath.Local) fspath.POSIX {
 
 // fileSystem is swapped out for testing.
 var fileSystem = os.DirFS("/")
+
+// git for-each-ref --count=1 --sort='-*creatordate' --format='%(creatordate:unix)' refs/remotes/origin/*
 
 // remoteRefUpdateTimes returns information about the repository's remote git references from a
 // gitdir path.

@@ -223,11 +223,11 @@ func (s *Syncable) RootDir() fspath.Local {
 func (s *Syncable) updateContents(ctx context.Context) {
 	slog.Debug("Updating contents...")
 
-	fetchFlags := []string{"fetch", target.DefaultRemote}
+	fetchArgs := []string{"fetch", target.DefaultRemote}
 	if src := s.source; src != nil {
-		fetchFlags = append(src.FetchFlags, fetchFlags...)
+		fetchArgs = append(src.FetchFlags, fetchArgs...) // TODO: Reorder?
 	}
-	runGitCommand(ctx, s.GitDir, fetchFlags)
+	runGitCommand(ctx, s.GitDir, fetchArgs)
 
 	if s.isBare() {
 		// Update HEAD directly so that gitweb shows the most recent remote commit.

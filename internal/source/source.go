@@ -2,7 +2,9 @@
 package source
 
 import (
-	"net/url"
+	"maps"
+	urlpkg "net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -22,10 +24,13 @@ type Source struct {
 	RelPath fspath.POSIX
 	// Last time the remote repository was updated. Zero if unknown.
 	LastUpdatedAt time.Time
-	// URL used to fetch repository updates. Non-empty.
+	// URL used to fetch updates. Non-empty.
 	FetchURL string
-	// Git flags used to fetch repository updates.
+	// Git flags used to fetch updates. This is particularly useful for authentication.
 	FetchFlags []string
+	// All URLs associated with this repository. This is used to map existing local repositories to
+	// sources.
+	URLs []string
 }
 
 type options struct {
@@ -35,16 +40,27 @@ type options struct {
 	remoteProtocol configpb.RemoteProtocol
 }
 
-func fromURL(u *url.URL, opts options) *Source {
+func fromURL(u *urlpkg.URL, opts options) *Source {
 	return &Source{
 		FullName:      fullNameFromURL(u),
 		FetchURL:      u.String(),
 		DefaultBranch: opts.defaultBranch,
 		RelPath:       opts.path,
 		FetchFlags:    opts.fetchFlags,
+		URLs:          []string{u.String()},
 	}
 }
 
-func fullNameFromURL(u *url.URL) string {
+func fullNameFromURL(u *urlpkg.URL) string {
 	return strings.TrimPrefix(strings.TrimSuffix(u.Path, ".git"), "/")
+}
+
+func distinctURLs(ss ...string) []string {
+	set := make(map[string]struct{})
+	for _, s := range ss {
+		if s != "" {
+			set[s] = struct{}{}
+		}
+	}
+	return slices.Collect(maps.Keys(set))
 }
